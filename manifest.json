@@ -1,0 +1,21 @@
+{
+  "name": "Pastoreo",
+  "short_name": "Pastoreo",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#c0392b",
+  "icons": [
+    {
+      "src": "logo_de_redencion.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logo_de_redencion.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

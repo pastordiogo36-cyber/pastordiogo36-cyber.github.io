@@ -1,0 +1,3757 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Pastoreo</title>
+  <meta name="theme-color" content="#c0392b" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="logo_de_redencion.png" />
+  <link rel="apple-touch-icon" href="logo_de_redencion.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <style>
+    /* ===== TODOS LOS ESTILOS EXISTENTES SE MANTIENEN ===== */
+    :root {
+      --rojo: #c0392b;
+      --rojo-oscuro: #922b21;
+      --rojo-claro: #e74c3c;
+      --dorado: #f39c12;
+      --verde: #27ae60;
+      --negro: #0d0d0d;
+      --gris-oscuro: #1a1a1a;
+      --gris-medio: #2d2d2d;
+      --gris-claro: #4a4a4a;
+      --blanco: #fafafa;
+      --texto-suave: #b0a090;
+      --radio: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--negro);
+      color: var(--blanco);
+      min-height: 100vh;
+      max-width: 480px;
+      margin: 0 auto;
+      overflow-x: hidden;
+    }
+
+    /* ===== LOGIN ===== */
+    .login-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      background: radial-gradient(ellipse at 50% 20%, #3d0f0f 0%, var(--negro) 65%);
+    }
+
+    .logo-placeholder {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: none;
+      border: none;
+      margin-bottom: 12px;
+    }
+
+    .logo-placeholder img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .app-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 38px;
+      font-weight: 900;
+    }
+
+    .app-subtitle {
+      font-size: 13px;
+      color: var(--texto-suave);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .login-card {
+      background: var(--gris-oscuro);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radio);
+      padding: 32px 28px;
+      width: 100%;
+      margin-top: 40px;
+    }
+
+    .login-card h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      margin-bottom: 8px;
+    }
+
+    .login-card p {
+      color: var(--texto-suave);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--texto-suave);
+      margin-bottom: 8px;
+    }
+
+    .input-group input,
+    .input-group select,
+    .input-group textarea {
+      width: 100%;
+      background: var(--gris-medio);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 14px 16px;
+      color: var(--blanco);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+      appearance: none;
+    }
+
+    .input-group input:focus,
+    .input-group select:focus,
+    .input-group textarea:focus {
+      border-color: var(--rojo);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--rojo);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 16px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-primary:hover {
+      background: var(--rojo-claro);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--rojo);
+      color: var(--rojo-claro);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(192, 57, 43, 0.1);
+    }
+
+    .error-msg {
+      background: rgba(192, 57, 43, 0.15);
+      border: 1px solid rgba(192, 57, 43, 0.3);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #e74c3c;
+      margin-top: 12px;
+    }
+
+    .success-msg {
+      background: rgba(39, 174, 96, 0.15);
+      border: 1px solid rgba(39, 174, 96, 0.3);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #2ecc71;
+      margin-top: 12px;
+    }
+
+    /* ===== HEADER ===== */
+    .app-header {
+      background: var(--gris-oscuro);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--rojo);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .header-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .header-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 19px;
+      font-weight: 700;
+    }
+
+    .header-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .user-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      color: var(--blanco);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      user-select: none;
+    }
+
+    .rol-badge {
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    .rol-pastor {
+      background: rgba(192, 57, 43, 0.2);
+      color: var(--rojo-claro);
+      border: 1px solid rgba(192, 57, 43, 0.3);
+    }
+
+    .rol-hory {
+      background: rgba(192, 57, 43, 0.2);
+      color: var(--rojo-claro);
+      border: 1px solid rgba(192, 57, 43, 0.3);
+    }
+
+    .rol-nangareko {
+      background: rgba(39, 174, 96, 0.2);
+      color: #2ecc71;
+      border: 1px solid rgba(39, 174, 96, 0.3);
+    }
+
+    .rol-lider_dc {
+      background: rgba(52, 152, 219, 0.2);
+      color: #3498db;
+      border: 1px solid rgba(52, 152, 219, 0.3);
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--texto-suave);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.2s;
+    }
+
+    .btn-logout:hover {
+      border-color: var(--rojo);
+      color: var(--rojo-claro);
+    }
+
+    /* ===== CONTENIDO ===== */
+    .main-content {
+      padding: 18px 18px 100px;
+    }
+
+    .welcome-banner {
+      background: linear-gradient(135deg, var(--rojo-oscuro), var(--gris-medio));
+      border-radius: var(--radio);
+      padding: 22px;
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .welcome-banner::after {
+      content: '✝';
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 56px;
+      opacity: 0.08;
+    }
+
+    .welcome-banner h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 21px;
+      margin-bottom: 5px;
+    }
+
+    .welcome-banner p {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+    }
+
+    /* ===== MENÚ CARDS ===== */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .menu-card {
+      background: var(--gris-oscuro);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radio);
+      padding: 20px 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .menu-card:hover {
+      border-color: var(--rojo);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(192, 57, 43, 0.2);
+    }
+
+    .menu-card .icon {
+      font-size: 32px;
+    }
+
+    .menu-card .card-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .menu-card .card-desc {
+      font-size: 11px;
+      color: var(--texto-suave);
+      line-height: 1.4;
+    }
+
+    .menu-card-full {
+      grid-column: 1 / -1;
+    }
+
+    /* ===== SECCIÓN HEADER ===== */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .section-header h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+    }
+
+    .btn-back {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--texto-suave);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .btn-back:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      color: var(--blanco);
+    }
+
+    /* ===== SERVICIO SELECTOR ===== */
+    .servicio-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .servicio-btn {
+      flex: 1;
+      padding: 14px 10px;
+      border: 2px solid rgba(255, 255, 255, 0.08);
+      background: var(--gris-oscuro);
+      color: var(--texto-suave);
+      border-radius: 12px;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .servicio-btn.active {
+      border-color: var(--rojo);
+      color: var(--blanco);
+      background: rgba(192, 57, 43, 0.15);
+    }
+
+    .servicio-btn .dia {
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+
+    .servicio-btn .hora {
+      font-size: 11px;
+      color: var(--texto-suave);
+      margin-top: 2px;
+    }
+
+    /* ===== LISTA CONGREGANTES ===== */
+    .search-input {
+      width: 100%;
+      background: var(--gris-medio);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: var(--blanco);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      outline: none;
+      margin-bottom: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--rojo);
+    }
+
+    .congregante-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--gris-oscuro);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      transition: all 0.2s;
+    }
+
+    .congregante-item.presente {
+      border-color: rgba(39, 174, 96, 0.3);
+      background: rgba(39, 174, 96, 0.05);
+    }
+
+    .congregante-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .congregante-foto {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--gris-medio);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 2px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .congregante-foto img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .congregante-nombre {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .congregante-estado {
+      font-size: 11px;
+      color: var(--texto-suave);
+      margin-top: 2px;
+    }
+
+    .estado-nuevo {
+      color: #f39c12;
+    }
+
+    .estado-en_proceso {
+      color: #3498db;
+    }
+
+    .estado-graduado {
+      color: #2ecc71;
+    }
+
+    /* ===== SWITCH ===== */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 28px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--gris-claro);
+      transition: 0.3s;
+      border-radius: 28px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 22px;
+      width: 22px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    input:checked+.slider {
+      background: var(--verde);
+    }
+
+    input:checked+.slider:before {
+      transform: translateX(22px);
+    }
+
+    /* ===== NUEVO INGRESO ===== */
+    .nuevo-form {
+      background: var(--gris-oscuro);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radio);
+      padding: 24px;
+    }
+
+    .foto-upload {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--gris-medio);
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      margin: 0 auto 20px;
+      font-size: 24px;
+      transition: all 0.2s;
+    }
+
+    .foto-upload:hover {
+      border-color: var(--rojo);
+    }
+
+    .foto-upload span {
+      font-size: 10px;
+      color: var(--texto-suave);
+      margin-top: 4px;
+    }
+
+    .foto-upload img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    /* ===== ESTADÍSTICAS ===== */
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: var(--gris-oscuro);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 14px 10px;
+      text-align: center;
+    }
+
+    .stat-numero {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--texto-suave);
+      margin-top: 4px;
+    }
+
+    /* ===== INFO SECTION ===== */
+    .info-section {
+      background: var(--gris-oscuro);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radio);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .info-section h3 {
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--texto-suave);
+      margin-bottom: 16px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 14px;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-row .label {
+      color: var(--texto-suave);
+    }
+
+    /* ===== COMING SOON ===== */
+    .coming-soon {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--texto-suave);
+    }
+
+    .coming-soon .big-icon {
+      font-size: 56px;
+      margin-bottom: 16px;
+    }
+
+    .coming-soon h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      color: var(--blanco);
+      margin-bottom: 8px;
+    }
+
+    .coming-soon p {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .tag-etapa {
+      display: inline-block;
+      background: rgba(192, 57, 43, 0.15);
+      border: 1px solid rgba(192, 57, 43, 0.3);
+      color: var(--rojo-claro);
+      font-size: 11px;
+      letter-spacing: 1px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-top: 12px;
+    }
+
+    /* ===== LOADING ===== */
+    .loading-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(192, 57, 43, 0.2);
+      border-top-color: var(--rojo);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .setup-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      background: radial-gradient(ellipse at 50% 20%, #1a0a00 0%, var(--negro) 65%);
+    }
+
+    .setup-form {
+      width: 100%;
+      background: var(--gris-oscuro);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radio);
+      padding: 28px;
+    }
+
+    /* ===== TOAST ===== */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--verde);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 999;
+      animation: fadeInUp 0.3s ease;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      white-space: nowrap;
+    }
+
+    .toast.error {
+      background: var(--rojo);
+    }
+
+    /* ===== MODAL ===== */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background: var(--gris-oscuro);
+      border-radius: var(--radio);
+      padding: 24px;
+      max-width: 90%;
+      width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px) translateX(-50%);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) translateX(-50%);
+      }
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <script>
+    // ============================================
+    // SUPABASE CONFIGURATION
+    // ============================================
+    const { createClient } = supabase;
+
+    // TODO: Reemplaza con tus claves de Supabase si cambian
+    const SUPABASE_URL = 'https://wqojjgfeyyppfdsretid.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indxb2pqZ2ZleXlwcGZkc3JldGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Njk3NTUsImV4cCI6MjA5MjA0NTc1NX0.cN5mzaNTyRJuU1Af01QbOX_YIEBkAUGLJ3H-IYfbrMI';
+
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let realtimeChannels = [];
+    let realtimeRefreshTimer = null;
+    let realtimeRefreshInFlight = false;
+
+    let navigationInFlight = false;
+    let serviceChangeInFlight = false;
+
+    let state = {
+      loading: true,
+      session: null,
+      usuario: null,
+      pantalla: 'home',
+      servicioActivo: 'domingo',
+      congregantes: [],
+      asistenciasHoy: {},
+      asistenciasPorServicio: { domingo: {}, miercoles: {} },
+      busqueda: '',
+      fotoNuevo: null,
+      fotoEdicion: null,
+      stats: { total: 0, presentes: 0, nuevos: 0 },
+      // Pastor
+      lideres: [],
+      nuevosUltimaSemana: 0,
+      asistenciaPromedio: 0,
+      ultimosCongregantes: [],
+      alertasRecientes: [],
+      gruposDC: [],
+      pastorLiderSeleccionadoId: null,
+      pastorFichaTarget: null,
+      pastorFichasLider: [],
+      pastorFichasCongregante: [],
+      // Ñangareko
+      misCuidados: [],
+      alertasNuevos: [],
+      contactosSemana: 0,
+      congreganteSeleccionado: null,
+      // Líder DC
+      miGrupo: null,
+      miembrosGrupo: [],
+      asistenciaDCHoy: {},
+      liderDCContactos: [],
+      liderDCFichas: []
+    };
+
+    // ============================================
+    // UTILITIES & GLOBAL FUNCTIONS (Common to all roles)
+    // ============================================
+
+    // Toast notifications
+    function mostrarToast(msg, tipo = 'ok') {
+      const t = document.createElement('div');
+      t.className = 'toast' + (tipo === 'error' ? ' error' : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    // Sanitize user input (prevents XSS)
+    function sanitizar(texto) {
+      if (!texto) return '';
+      const div = document.createElement('div');
+      div.textContent = texto;
+      return div.innerHTML;
+    }
+
+    function getIniciales(nombre) {
+      return String(nombre || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(p => p[0])
+        .join('')
+        .substring(0, 2)
+        .toUpperCase();
+    }
+
+    // Debounce function to limit execution frequency (performance optimization)
+    function debounce(fn, delay) {
+      let timeoutId;
+      return function (...args) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          fn.apply(this, args);
+        }, delay);
+      };
+    }
+
+    function withTimeout(promise, ms, label) {
+      let timeoutId;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`Timeout: ${label || 'operación'} (${ms}ms)`));
+        }, ms);
+      });
+      return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+    }
+
+    function estadoLabel(estado) {
+      const labels = { nuevo: '✨ Nuevo', en_proceso: '🔵 En proceso', en_anua: '📚 En Añua', bautizado: '💧 Bautizado', en_dc: '🏠 En DC', graduado: '🎓 Graduado', visita: '👋 Visita' };
+      return labels[estado] || estado;
+    }
+
+    // ============================================
+    // REALTIME AND AUTHENTICATION MANAGEMENT
+    // ============================================
+
+    // Load user profile from 'usuarios' table
+    async function cargarUsuario() {
+      if (!state.session) return;
+      const { data } = await sb.from('usuarios').select('*').eq('id', state.session.user.id).single();
+      state.usuario = data || null;
+    }
+
+    // Supabase Realtime Listener (for Ñangareko new alerts)
+    function cleanupRealtimeListeners() {
+      (realtimeChannels || []).forEach((ch) => {
+        try { sb.removeChannel(ch); } catch (e) { /* noop */ }
+      });
+      realtimeChannels = [];
+    }
+
+    function setupRealtimeListeners() {
+      cleanupRealtimeListeners();
+
+      // Suscripción a la tabla 'congregantes' para notificar nuevos ingresos
+      const alertasNuevosChannel = sb.channel('alertas-nuevos')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'congregantes' }, async (payload) => {
+          const nuevoCongregante = payload.new;
+
+          // 1. Verificar si el nuevo congregante es un "Nuevo" (estado 'nuevo')
+          //    y si no tiene un ñangareko asignado aún (la alerta no se disparó antes)
+          if (nuevoCongregante.estado === 'nuevo' && !nuevoCongregante.nangareko_id) {
+
+            // 2. Si el usuario actual es un Ñangareko, actualiza su lista de alertas
+            if (state.usuario?.rol === 'nangareko') {
+              await cargarDatosNangareko();
+              mostrarToast(`🚨 ¡Nuevo ingreso! ${nuevoCongregante.nombre}`);
+              render();
+            }
+          }
+        })
+        .subscribe();
+
+      // Suscripción general para mantener listas actualizadas (Hory / Pastor / Ñangareko / Líder DC)
+      // Nota: esto depende de Realtime habilitado en Supabase para la tabla y de que RLS permita ver filas.
+      const congregantesSyncChannel = sb.channel('congregantes-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'congregantes' }, async () => {
+          if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
+          realtimeRefreshTimer = setTimeout(async () => {
+            if (realtimeRefreshInFlight) return;
+            realtimeRefreshInFlight = true;
+            try {
+              await cargarCongregantes();
+              if (state.usuario?.rol === 'nangareko') {
+                await cargarDatosNangareko();
+              }
+              if (state.usuario?.rol === 'pastor') {
+                await cargarDatosPastor();
+              }
+              if (state.usuario?.rol === 'lider_dc') {
+                await cargarDatosLiderDC();
+              }
+              if (['asistencia', 'home', 'nangareko-alertas', 'nangareko-cuidados', 'lider-dc-asistencia'].includes(state.pantalla)) {
+                render();
+              }
+            } finally {
+              realtimeRefreshInFlight = false;
+            }
+          }, 500);
+        })
+        .subscribe();
+
+      realtimeChannels.push(alertasNuevosChannel, congregantesSyncChannel);
+    }
+
+    // ============================================
+    // RENDER AND NAVIGATION LOGIC
+    // ============================================
+
+    function render() {
+      const app = document.getElementById('app');
+      if (state.loading) { app.innerHTML = renderLoading(); return; }
+      if (!state.session) { app.innerHTML = renderLogin(); bindLogin(); return; }
+      if (!state.usuario) { app.innerHTML = renderSetup(); bindSetup(); return; }
+
+      app.innerHTML = `
+      ${renderHeader()}
+      <div class="main-content">
+        ${renderPantalla()}
+      </div>`;
+      bindApp();
+    }
+
+    window.cambiarPantalla = async function (pantalla) {
+      if (navigationInFlight) return;
+      navigationInFlight = true;
+      const watchdog = setTimeout(() => {
+        if (navigationInFlight) {
+          navigationInFlight = false;
+          mostrarToast('⚠️ La operación tardó demasiado. Probá de nuevo.', 'error');
+          try { render(); } catch (e) { console.error('Error al renderizar:', e); }
+        }
+      }, 25000);
+
+      const pantallaAnterior = state.pantalla;
+      state.pantalla = pantalla;
+      state.busqueda = '';
+      try { render(); } catch (e) { console.error('Error al renderizar:', e); }
+
+      try {
+        if (pantallaAnterior === 'asistencia' && pantalla !== 'asistencia') {
+          await withTimeout(guardarAsistencias(), 20000, 'guardar asistencias');
+        }
+
+        if (pantalla === 'asistencia') {
+          await withTimeout(cargarCongregantes(), 20000, 'cargar congregantes');
+          const cache = state.asistenciasPorServicio?.[state.servicioActivo];
+          if (cache && Object.keys(cache).length > 0) {
+            state.asistenciasHoy = { ...cache };
+          } else {
+            await withTimeout(cargarAsistenciasHoy(), 20000, 'cargar asistencias');
+          }
+        }
+
+        if (pantalla === 'home') {
+          if (state.usuario?.rol === 'pastor') await withTimeout(cargarDatosPastor(), 20000, 'cargar datos pastor');
+          if (state.usuario?.rol === 'nangareko') await withTimeout(cargarDatosNangareko(), 20000, 'cargar datos ñangareko');
+          if (state.usuario?.rol === 'lider_dc') await withTimeout(cargarDatosLiderDC(), 20000, 'cargar datos líder dc');
+          if (state.usuario?.rol === 'hory') await withTimeout(cargarStatsHory(), 20000, 'cargar stats hory');
+        }
+
+        if (pantalla === 'lider-dc-asistencia') {
+          state.asistenciaDCHoy = {};
+        }
+      } catch (e) {
+        console.error('Error al cambiar de pantalla:', e);
+        const detalle = String(e?.message || '');
+        if (detalle.startsWith('Timeout:')) {
+          mostrarToast('⚠️ La operación tardó demasiado. ' + detalle.replace('Timeout: ', ''), 'error');
+        } else {
+          mostrarToast('⚠️ Ocurrió un error o la conexión está lenta. Probá de nuevo.', 'error');
+        }
+      } finally {
+        clearTimeout(watchdog);
+        navigationInFlight = false;
+        try { render(); } catch (e) { console.error('Error al renderizar:', e); }
+      }
+    };
+
+    window.logout = async function () {
+      try {
+        await withTimeout(sb.auth.signOut(), 12000, 'cerrar sesión');
+      } catch (e) {
+        console.error('Error al cerrar sesión:', e);
+        mostrarToast('⚠️ No se pudo cerrar sesión', 'error');
+      }
+    };
+
+    window.irA = function (pantalla) {
+      alert('Esta sección estará disponible próximamente 🚀\n\n→ ' + pantalla);
+    };
+
+    // ============================================
+    // LOGIN AND SETUP SCREENS
+    // ============================================
+
+    function renderLoading() {
+      return `<div class="loading-screen"><div class="spinner"></div><p style="color:var(--texto-suave);font-size:14px">Cargando Pastoreo...</p></div>`;
+    }
+
+    function renderLogin() {
+      return `
+      <div class="login-screen">
+        <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:40px">
+          <div class="logo-placeholder"><img src="logo_de_redencion.png" alt="Logo" /></div>
+          <div class="app-title">Pastoreo</div>
+          <div class="app-subtitle">Redención en Avivamiento</div>
+        </div>
+        <div class="login-card">
+          <h2>Bienvenido</h2>
+          <p>Ingresá con tus credenciales de líder</p>
+          <div class="input-group"><label>Email</label><input type="email" id="email-input" placeholder="tu@email.com" /></div>
+          <div class="input-group"><label>Contraseña</label><input type="password" id="pass-input" placeholder="••••••••" /></div>
+          <button class="btn-primary" id="btn-login">Ingresar</button>
+          <div id="login-error" style="display:none" class="error-msg"></div>
+        </div>
+      </div>`;
+    }
+
+    function bindLogin() {
+      const btn = document.getElementById('btn-login');
+      const err = document.getElementById('login-error');
+      async function doLogin() {
+        const email = document.getElementById('email-input').value.trim();
+        const pass = document.getElementById('pass-input').value;
+        if (!email || !pass) { err.style.display = 'block'; err.textContent = 'Completá email y contraseña.'; return; }
+        btn.disabled = true; btn.textContent = 'Ingresando...'; err.style.display = 'none';
+        const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+        if (error) { err.style.display = 'block'; err.textContent = 'Email o contraseña incorrectos.'; btn.disabled = false; btn.textContent = 'Ingresar'; }
+      }
+      btn.addEventListener('click', doLogin);
+      document.getElementById('pass-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    }
+
+    function renderSetup() {
+      return `
+      <div class="setup-screen">
+        <div style="font-size:64px;margin-bottom:24px">👤</div>
+        <h2 style="font-family:'Playfair Display',serif;font-size:26px;margin-bottom:12px">Completá tu perfil</h2>
+        <p style="color:var(--texto-suave);font-size:14px;margin-bottom:32px;text-align:center">Primera vez ingresando.<br>Completá estos datos para continuar.</p>
+        <div class="setup-form">
+          <div class="input-group"><label>Tu nombre completo</label><input type="text" id="setup-nombre" placeholder="Nombre y apellido" /></div>
+          <div class="input-group"><label>Tu rol</label>
+            <select id="setup-rol">
+              <option value="">Seleccioná tu rol</option>
+              <option value="pastor">Pastor</option>
+              <option value="hory">Hory (Asistencia)</option>
+              <option value="nangareko">Ñangareko (Cuidador)</option>
+              <option value="lider_dc">Líder DC</option>
+            </select>
+          </div>
+          <button class="btn-primary" id="btn-setup">Guardar y continuar</button>
+          <div id="setup-error" style="display:none" class="error-msg"></div>
+        </div>
+      </div>`;
+    }
+
+    function bindSetup() {
+      document.getElementById('btn-setup').addEventListener('click', async () => {
+        const nombre = document.getElementById('setup-nombre').value.trim();
+        const rol = document.getElementById('setup-rol').value;
+        const err = document.getElementById('setup-error');
+        if (!nombre || !rol) { err.style.display = 'block'; err.textContent = 'Completá todos los campos.'; return; }
+        const { error } = await sb.from('usuarios').upsert({ id: state.session.user.id, nombre, email: state.session.user.email, rol });
+        if (error) { err.style.display = 'block'; err.textContent = 'Error: ' + error.message; return; }
+        await cargarUsuario(); render();
+      });
+    }
+
+    // ============================================
+    // HEADER & COMMON UI BINDING
+    // ============================================
+
+    function renderHeader() {
+      const u = state.usuario;
+      const rolLabel = { pastor: 'Pastor', hory: 'Hory', nangareko: 'Ñangareko', lider_dc: 'Líder DC' }[u.rol];
+      const iniciales = (u?.nombre || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(p => p[0])
+        .join('')
+        .toUpperCase();
+      return `
+      <div class="app-header">
+        <div class="header-left">
+          <div class="header-icon"><img src="logo_de_redencion.png" alt="Logo" /></div>
+          <div class="header-title">Pastoreo</div>
+        </div>
+        <div class="header-user">
+          <div class="user-avatar">${sanitizar(iniciales || '?')}</div>
+          <span class="rol-badge rol-${u.rol}">${rolLabel}</span>
+          <button class="btn-logout" id="btn-logout" onclick="logout()">Salir</button>
+        </div>
+      </div>`;
+    }
+
+    function bindApp() {
+      document.getElementById('btn-logout')?.addEventListener('click', async () => { await sb.auth.signOut(); });
+
+      // Binding for Nuevo Ingreso screen logic
+      const btnGuardar = document.getElementById('btn-guardar-nuevo');
+      if (btnGuardar) {
+        btnGuardar.addEventListener('click', async () => {
+          const err = document.getElementById('nuevo-error');
+          const exito = document.getElementById('nuevo-exito');
+          try {
+            const nombre = document.getElementById('nuevo-nombre')?.value.trim();
+            const telefono = document.getElementById('nuevo-telefono')?.value.trim();
+            if (!nombre) { err.style.display = 'block'; err.textContent = 'El nombre es obligatorio.'; return; }
+            btnGuardar.disabled = true; btnGuardar.textContent = 'Guardando...';
+            err.style.display = 'none';
+
+            const { data: nuevo, error } = await sb.from('congregantes').insert({
+              nombre, telefono: telefono || null, estado: 'nuevo'
+            }).select().single();
+
+            if (error) {
+              err.style.display = 'block'; err.textContent = 'Error al guardar: ' + error.message;
+              return;
+            }
+
+            // Notificación a Ñangarekos (si la política de usuarios lo permite)
+            const { data: nangarekos, error: errNang } = await sb.from('usuarios').select('id').eq('rol', 'nangareko');
+            if (!errNang && nangarekos && nangarekos.length > 0) {
+              const alertas = nangarekos.map(n => ({
+                usuario_id: n.id,
+                congregante_id: nuevo.id,
+                tipo: 'nuevo_ingreso',
+                mensaje: `${nombre} ingresó por primera vez`
+              }));
+              const { error: errAlertas } = await sb.from('alertas').insert(alertas);
+              if (errAlertas) console.error('Error al crear alertas:', errAlertas);
+            }
+
+            await cargarCongregantes();
+            if (exito) {
+              exito.style.display = 'block';
+              exito.textContent = `✅ ${nombre} registrado correctamente.`;
+            }
+            const nombreInput = document.getElementById('nuevo-nombre');
+            const telefonoInput = document.getElementById('nuevo-telefono');
+            if (nombreInput) nombreInput.value = '';
+            if (telefonoInput) telefonoInput.value = '';
+            state.fotoNuevo = null;
+            mostrarToast(`✨ ${nombre} registrado!`);
+          } catch (e) {
+            console.error('Error inesperado en nuevo ingreso:', e);
+            if (err) {
+              err.style.display = 'block';
+              err.textContent = 'Ocurrió un error inesperado. Probá de nuevo.';
+            }
+          } finally {
+            btnGuardar.disabled = false;
+            btnGuardar.textContent = 'Registrar nuevo ingreso';
+          }
+        });
+      }
+    }
+
+    // ============================================
+    // SECCIÓN PASTOR DASHBOARD & LOGIC
+    // ============================================
+
+    function renderPantalla() {
+      const rol = state.usuario.rol;
+      if (state.pantalla === 'home') {
+        if (rol === 'hory') return renderHomeHory();
+        if (rol === 'pastor') return renderHomePastor();
+        if (rol === 'nangareko') return renderHomeNangareko();
+        if (rol === 'lider_dc') return renderHomeLiderDC();
+      }
+      if (state.pantalla === 'asistencia') return renderAsistencia();
+      if (state.pantalla === 'nuevo-ingreso') return renderNuevoIngreso();
+      // Pastor sub-pantallas
+      if (state.pantalla === 'pastor-lideres') return renderPastorLideres();
+      if (state.pantalla === 'pastor-lider-detalle') return renderPastorLiderDetalle();
+      if (state.pantalla === 'pastor-lider-fichas') return renderPastorLiderFichas();
+      if (state.pantalla === 'pastor-congregacion') return renderPastorCongregacion();
+      if (state.pantalla === 'pastor-congregante-fichas') return renderPastorCongreganteFichas();
+      if (state.pantalla === 'pastor-calendario') return renderPastorCalendario();
+      if (state.pantalla === 'pastor-alertas') return renderPastorAlertas();
+      if (state.pantalla === 'pastor-grupos') return renderPastorGrupos();
+      // Ñangareko sub-pantallas
+      if (state.pantalla === 'nangareko-alertas') return renderNangarekoAlertas();
+      if (state.pantalla === 'nangareko-cuidados') return renderNangarekoCuidados();
+      if (state.pantalla === 'nangareko-fichas') return renderNangarekoFichas();
+      // Líder DC sub-pantallas
+      if (state.pantalla === 'lider-dc-grupo') return renderLiderDCGrupo();
+      if (state.pantalla === 'lider-dc-asistencia') return renderLiderDCAsistencia();
+      if (state.pantalla === 'lider-dc-fichas') return renderLiderDCFichas();
+      return `<div class="coming-soon"><div class="big-icon">🚧</div><h3>Próximamente</h3><p>Esta sección estará disponible en la siguiente etapa.</p><div class="tag-etapa">En construcción</div></div>`;
+    }
+
+    function renderHomePastor() {
+      const u = state.usuario;
+      const hora = new Date().getHours();
+      const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
+
+      const totalCongregantes = state.congregantes.length;
+      const totalLideres = state.lideres?.length || 0;
+      const nuevosUltimaSemana = state.nuevosUltimaSemana || 0;
+      const asistenciaPromedio = state.asistenciaPromedio || 0;
+
+      return `
+      <div class="main-content">
+        <div class="welcome-banner">
+          <h2>${saludo}, ${u.nombre.split(' ')[0]} 👋</h2>
+          <p>Panel del <strong>Pastor</strong> — Visión general de la iglesia</p>
+        </div>
+        
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-numero">${totalCongregantes}</div>
+            <div class="stat-label">Total Congregantes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-numero" style="color:var(--dorado)">${totalLideres}</div>
+            <div class="stat-label">Líderes Activos</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-numero" style="color:var(--verde)">${nuevosUltimaSemana}</div>
+            <div class="stat-label">Nuevos (7 días)</div>
+          </div>
+        </div>
+        
+        <div class="info-section">
+          <h3>📊 Asistencia últimos 7 días</h3>
+          <canvas id="asistenciaChart" style="width:100%; max-height:200px; margin-top:10px"></canvas>
+          <div class="info-row" style="margin-top:12px">
+            <span class="label">Promedio semanal</span>
+            <span style="font-weight:bold; color:var(--verde)">${asistenciaPromedio}%</span>
+          </div>
+        </div>
+        
+        <div class="info-section">
+          <h3>🕊️ Últimos ingresos</h3>
+          ${state.ultimosCongregantes && state.ultimosCongregantes.length > 0 ?
+          state.ultimosCongregantes.slice(0, 5).map(c => `
+              <div class="info-row">
+                <span class="label">${c.nombre}</span>
+                <span style="font-size:12px; color:var(--texto-suave)">${new Date(c.created_at).toLocaleDateString()}</span>
+              </div>
+            `).join('') :
+          '<div class="info-row"><span class="label">No hay congregantes registrados aún</span></div>'
+        }
+        </div>
+        
+        <div class="info-section">
+          <h3>🔔 Alertas recientes</h3>
+          ${state.alertasRecientes && state.alertasRecientes.length > 0 ?
+          state.alertasRecientes.slice(0, 3).map(a => `
+              <div class="info-row">
+                <span class="label">${a.tipo === 'nuevo_ingreso' ? '✨ Nuevo ingreso' : a.tipo}</span>
+                <span style="font-size:12px">${a.mensaje}</span>
+              </div>
+            `).join('') :
+          '<div class="info-row"><span class="label">No hay alertas recientes</span></div>'
+        }
+        </div>
+        
+        <div class="menu-grid" style="margin-top:20px">
+          <div class="menu-card" onclick="cambiarPantalla('pastor-lideres')">
+            <div class="icon">👥</div>
+            <div class="card-title">Líderes</div>
+            <div class="card-desc">Gestionar equipos</div>
+          </div>
+          <div class="menu-card" onclick="cambiarPantalla('pastor-congregacion')">
+            <div class="icon">🏛️</div>
+            <div class="card-title">Congregación</div>
+            <div class="card-desc">Ver todos los miembros</div>
+          </div>
+          <div class="menu-card" onclick="cambiarPantalla('pastor-grupos')">
+            <div class="icon">🏠</div>
+            <div class="card-title">Grupos DC</div>
+            <div class="card-desc">Crear y gestionar grupos</div>
+          </div>
+          <div class="menu-card" onclick="cambiarPantalla('pastor-calendario')">
+            <div class="icon">📅</div>
+            <div class="card-title">Calendario</div>
+            <div class="card-desc">Reuniones y eventos</div>
+          </div>
+        </div>
+      </div>
+    `;
+    }
+
+async function cargarDatosPastor() {
+    if (!state.usuario || state.usuario.rol !== 'pastor') return;
+
+    const fechaLimite = new Date();
+    fechaLimite.setDate(fechaLimite.getDate() - 7);
+    const fechaStr = fechaLimite.toISOString().split('T')[0];
+
+    const [
+      congregantesRes,
+      lideresRes,
+      nuevosRes,
+      asistDomRes,
+      asistMieRes,
+      ultimosRes,
+      alertasRes,
+      gruposRes
+    ] = await Promise.all([
+      sb.from('congregantes').select('*'),
+      sb.from('usuarios').select('*').order('nombre', { ascending: true }),
+      sb.from('congregantes').select('id', { count: 'exact' }).gte('created_at', fechaStr),
+      sb.from('asistencias').select('presente').eq('tipo_servicio', 'domingo').gte('fecha', fechaStr),
+      sb.from('asistencias').select('presente').eq('tipo_servicio', 'miercoles').gte('fecha', fechaStr),
+      sb.from('congregantes').select('nombre, created_at').order('created_at', { ascending: false }).limit(5),
+      sb.from('alertas').select('tipo, mensaje, created_at').order('created_at', { ascending: false }).limit(5),
+      sb.from('grupos_dc').select('*, lider:lider_id(nombre)').order('created_at', { ascending: false })
+    ]);
+
+    if (congregantesRes.error) {
+      console.error('Error al cargar congregantes (Pastor):', congregantesRes.error);
+      mostrarToast('⚠️ No se pudieron cargar congregantes (ver permisos/RLS)', 'error');
+      state.congregantes = [];
+    } else {
+      state.congregantes = congregantesRes.data || [];
+    }
+
+    if (lideresRes.error) {
+      console.error('Error al cargar usuarios/líderes (Pastor):', lideresRes.error);
+      state.lideres = [];
+    } else {
+      state.lideres = lideresRes.data || [];
+    }
+
+    if (nuevosRes.error) {
+      console.error('Error al cargar nuevos (Pastor):', nuevosRes.error);
+      state.nuevosUltimaSemana = 0;
+    } else {
+      state.nuevosUltimaSemana = nuevosRes.data?.length || 0;
+    }
+
+    const asistenciasDomingo = asistDomRes.error ? [] : (asistDomRes.data || []);
+    const asistenciasMiercoles = asistMieRes.error ? [] : (asistMieRes.data || []);
+    if (asistDomRes.error) console.error('Error al cargar asistencias domingo (Pastor):', asistDomRes.error);
+    if (asistMieRes.error) console.error('Error al cargar asistencias miércoles (Pastor):', asistMieRes.error);
+
+    const todasAsistencias = [...asistenciasDomingo, ...asistenciasMiercoles];
+    if (todasAsistencias.length > 0) {
+      const presentes = todasAsistencias.filter(a => a.presente).length;
+      state.asistenciaPromedio = Math.round((presentes / todasAsistencias.length) * 100);
+    } else {
+      state.asistenciaPromedio = 0;
+    }
+
+    if (ultimosRes.error) {
+      console.error('Error al cargar últimos ingresos (Pastor):', ultimosRes.error);
+      state.ultimosCongregantes = [];
+    } else {
+      state.ultimosCongregantes = ultimosRes.data || [];
+    }
+
+    if (alertasRes.error) {
+      console.error('Error al cargar alertas (Pastor):', alertasRes.error);
+      state.alertasRecientes = [];
+    } else {
+      state.alertasRecientes = alertasRes.data || [];
+    }
+
+    if (gruposRes.error) {
+      console.error('Error al cargar grupos DC (Pastor):', gruposRes.error);
+      state.gruposDC = [];
+    } else {
+      state.gruposDC = gruposRes.data || [];
+    }
+
+    setTimeout(() => dibujarGraficoAsistencia(), 100);
+}
+
+    function dibujarGraficoAsistencia() {
+      const canvas = document.getElementById('asistenciaChart');
+      if (!canvas) return;
+
+      const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+      const asistenciasPorDia = [65, 70, 82, 68, 72, 85, 90];
+
+      new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: diasSemana,
+          datasets: [{
+            label: 'Asistencia %',
+            data: asistenciasPorDia,
+            borderColor: '#c0392b',
+            backgroundColor: 'rgba(192, 57, 43, 0.1)',
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { labels: { color: '#b0a090' } }
+          },
+          scales: {
+            y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#b0a090' } },
+            x: { ticks: { color: '#b0a090' } }
+          }
+        }
+      });
+    }
+
+    function renderPastorLideres() {
+      const usuarios = state.lideres || [];
+      const roles = [
+        { value: 'pastor', label: 'Pastor' },
+        { value: 'nangareko', label: 'Ñangareko' },
+        { value: 'hory', label: 'Hory' },
+        { value: 'lider_dc', label: 'Líder DC' }
+      ];
+
+      const porRol = {
+        pastor: usuarios.filter(u => u.rol === 'pastor'),
+        hory: usuarios.filter(u => u.rol === 'hory'),
+        nangareko: usuarios.filter(u => u.rol === 'nangareko'),
+        lider_dc: usuarios.filter(u => u.rol === 'lider_dc')
+      };
+
+      function renderLista(titulo, lista) {
+        return `
+        <div class="info-section" style="margin-bottom:12px">
+          <h3 style="margin:0 0 12px 0">${titulo} <span style="font-size:12px;color:var(--texto-suave)">(${lista.length})</span></h3>
+          ${lista.length === 0 ?
+            `<div class="info-row"><span class="label">Sin registros</span></div>` :
+            lista.map(u => {
+              const iniciales = getIniciales(u.nombre || '');
+              return `
+              <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.06)">
+                <div class="info-row" style="align-items:center">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div class="congregante-foto" style="width:38px;height:38px">${u.foto_url ? `<img src="${sanitizar(u.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                    <div>
+                      <div class="label" style="cursor:pointer" onclick="verDetalleLider('${u.id}')">${sanitizar(u.nombre || '(Sin nombre)')}</div>
+                      <div style="font-size:12px;color:var(--texto-suave)">${sanitizar(u.email || '')}</div>
+                    </div>
+                  </div>
+                  <select style="width:160px" onchange="actualizarRolUsuario('${u.id}', this.value)">
+                    ${roles.map(r => `<option value="${r.value}" ${u.rol === r.value ? 'selected' : ''}>${r.label}</option>`).join('')}
+                  </select>
+                </div>
+              </div>`;
+            }).join('')
+          }
+        </div>`;
+      }
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>👥 Líderes</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+
+        <button class="btn-primary" style="margin-bottom:16px" onclick="pastorAgregarLider()">➕ Agregar líder</button>
+
+        ${usuarios.length === 0 ?
+          `<div class="coming-soon">
+            <div class="big-icon">👥</div>
+            <h3>No hay usuarios visibles</h3>
+            <p>Si esto no es correcto, revisá permisos/RLS de la tabla usuarios</p>
+          </div>` :
+          (
+            renderLista('Horys', porRol.hory) +
+            renderLista('Ñangarekos', porRol.nangareko) +
+            renderLista('Líderes de DC', porRol.lider_dc) +
+            renderLista('Pastor', porRol.pastor)
+          )
+        }
+      </div>
+    `;
+    }
+
+    function renderPastorLiderDetalle() {
+      const usuarioId = state.pastorLiderSeleccionadoId;
+      const u = (state.lideres || []).find(x => x.id === usuarioId);
+      if (!u) {
+        return `
+        <div class="main-content">
+          <div class="section-header">
+            <h3>👤 Líder</h3>
+            <button class="btn-back" onclick="cambiarPantalla('pastor-lideres')">← Volver</button>
+          </div>
+          <div class="coming-soon">
+            <div class="big-icon">👤</div>
+            <h3>No encontrado</h3>
+          </div>
+        </div>`;
+      }
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>👤 Perfil del líder</h3>
+          <button class="btn-back" onclick="cambiarPantalla('pastor-lideres')">← Volver</button>
+        </div>
+
+        <div class="info-section" style="margin-bottom:12px">
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="congregante-foto" style="width:56px;height:56px">${u.foto_url ? `<img src="${sanitizar(u.foto_url)}" />` : sanitizar(getIniciales(u.nombre || '') || '?')}</div>
+            <div>
+              <div style="font-size:16px;font-weight:700">${sanitizar(u.nombre || '(Sin nombre)')}</div>
+              <div style="font-size:12px;color:var(--texto-suave)">${sanitizar(u.email || '')}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Datos</h3>
+          <div class="info-row"><span class="label">Teléfono</span><span>${sanitizar(u.telefono || '—')}</span></div>
+          <div class="info-row"><span class="label">Estado</span><span>${sanitizar(u.estado || '—')}</span></div>
+          <div class="info-row"><span class="label">Rol</span><span>${sanitizar(u.rol || '—')}</span></div>
+        </div>
+
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Ficha del pastor</h3>
+          <button class="btn-primary" style="margin-top:0" onclick="abrirFichaPastorLider('${sanitizar(u.id)}','${sanitizar(u.nombre || '')}')">📝 Registrar contacto</button>
+          <div style="margin-top:12px">
+            ${(state.pastorFichasLider || []).length === 0 ?
+              '<div class="info-row"><span class="label">Sin contactos registrados</span></div>' :
+              (state.pastorFichasLider || []).slice(0, 5).map(f => `
+                <div class="info-row">
+                  <span class="label">${sanitizar(f.tipo_contacto || 'contacto')}</span>
+                  <span style="font-size:12px;color:var(--texto-suave)">${new Date(f.created_at).toLocaleDateString()}</span>
+                </div>
+              `).join('')
+            }
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function renderPastorCongregacion() {
+      const grupos = state.gruposDC || [];
+      const nangarekos = (state.lideres || []).filter(u => u.rol === 'nangareko');
+      const estadoOpciones = [
+        { value: 'nuevo', label: estadoLabel('nuevo') },
+        { value: 'visita', label: estadoLabel('visita') },
+        { value: 'en_proceso', label: estadoLabel('en_proceso') },
+        { value: 'en_anua', label: estadoLabel('en_anua') },
+        { value: 'bautizado', label: estadoLabel('bautizado') },
+        { value: 'en_dc', label: estadoLabel('en_dc') },
+        { value: 'graduado', label: estadoLabel('graduado') }
+      ];
+
+      const busq = (state.pastorCongregacionBusqueda || '').toLowerCase();
+      const lista = (state.congregantes || []).filter(c => {
+        if (!busq) return true;
+        return (c.nombre || '').toLowerCase().includes(busq);
+      });
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>🏛️ Congregación</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+
+        <div class="input-group" style="margin-bottom:12px">
+          <label>Buscar</label>
+          <input type="text" placeholder="Escribí un nombre..." value="${sanitizar(state.pastorCongregacionBusqueda || '')}" oninput="actualizarBusquedaCongregacion(this.value)" />
+        </div>
+
+        ${lista.length === 0 ?
+          `<div style="text-align:center;color:var(--texto-suave);padding:32px;font-size:14px">No se encontraron resultados.</div>` :
+          lista.map(c => {
+            const grupoActual = c.grupo_dc_id ? grupos.find(g => g.id === c.grupo_dc_id) : null;
+            const nangareko = c.nangareko_id ? nangarekos.find(n => n.id === c.nangareko_id) : null;
+            const iniciales = (c.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            return `
+              <div class="info-section" style="margin-bottom:12px">
+                <div class="info-row">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div class="congregante-foto" style="width:38px;height:38px">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                    <span class="label">${sanitizar(c.nombre)}</span>
+                  </div>
+                  <span class="estado-${c.estado}">${estadoLabel(c.estado)}</span>
+                </div>
+
+                <div class="info-row">
+                  <span class="label">Estado</span>
+                  <select style="width:200px" onchange="actualizarEstadoCongregante('${c.id}', this.value)">
+                    ${estadoOpciones.map(o => `<option value="${o.value}" ${c.estado === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+                  </select>
+                </div>
+
+                <div class="info-row">
+                  <span class="label">Grupo DC</span>
+                  <select style="width:200px" onchange="actualizarGrupoDCCongregante('${c.id}', this.value)">
+                    <option value="">(Sin grupo)</option>
+                    ${grupos.map(g => `<option value="${g.id}" ${c.grupo_dc_id === g.id ? 'selected' : ''}>${sanitizar(g.nombre)}</option>`).join('')}
+                  </select>
+                </div>
+
+                <div class="info-row">
+                  <span class="label">Ñangareko</span>
+                  <span>${nangareko ? sanitizar(nangareko.nombre) : '—'}</span>
+                </div>
+
+                <div style="display:flex; gap:8px; margin-top:12px">
+                  <button class="btn-primary" style="flex:1; padding:10px" onclick="abrirFichaPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📝 Registrar contacto</button>
+                  <button class="btn-primary" style="flex:1; padding:10px; background:var(--gris-medio)" onclick="verHistorialFichasPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📜 Historial</button>
+                </div>
+              </div>`;
+          }).join('')
+        }
+      </div>
+    `;
+    }
+
+    function renderPastorLiderFichas() {
+      const t = state.pastorFichaTarget;
+      if (!t || t.tipo !== 'lider') {
+        return `<div class="main-content"><div class="section-header"><h3>📋 Ficha</h3><button class="btn-back" onclick="cambiarPantalla('pastor-lideres')">← Volver</button></div></div>`;
+      }
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>📋 Contacto con: ${sanitizar(t.nombre || '')}</h3>
+          <button class="btn-back" onclick="cambiarPantalla('pastor-lider-detalle')">← Volver</button>
+        </div>
+        <div class="nuevo-form">
+          <div class="input-group">
+            <label>Tipo de contacto</label>
+            <select id="pastor-ficha-tipo">
+              <option value="whatsapp">💬 WhatsApp</option>
+              <option value="llamada">📞 Llamada</option>
+              <option value="visita">🏠 Visita personal</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Versículo compartido (opcional)</label>
+            <input type="text" id="pastor-ficha-versiculo" placeholder="Ej: Salmo 23:1" />
+          </div>
+          <div class="input-group">
+            <label>Estado de ánimo</label>
+            <select id="pastor-ficha-animo">
+              <option value="muy_bien">😊 Muy bien</option>
+              <option value="animado">🙂 Animado</option>
+              <option value="desanimado">😐 Desanimado</option>
+              <option value="decaido">😔 Decaído</option>
+              <option value="con_miedo">😨 Con miedo</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Motivo de oración</label>
+            <textarea id="pastor-ficha-oracion" rows="2" style="width:100%; background:var(--gris-medio); border:none; border-radius:8px; padding:12px; color:white"></textarea>
+          </div>
+          <div class="input-group">
+            <label>Notas adicionales</label>
+            <textarea id="pastor-ficha-notas" rows="2" style="width:100%; background:var(--gris-medio); border:none; border-radius:8px; padding:12px; color:white"></textarea>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:20px">
+            <input type="checkbox" id="pastor-ficha-por-ausencia" />
+            <span style="font-size:13px">⚠️ Este contacto es porque faltó a algún servicio</span>
+          </label>
+          <button class="btn-primary" onclick="guardarFichaPastorLider()">✅ Guardar contacto</button>
+        </div>
+      </div>`;
+    }
+
+    function renderPastorCongreganteFichas() {
+      const t = state.pastorFichaTarget;
+      if (!t || t.tipo !== 'congregante') {
+        return `<div class="main-content"><div class="section-header"><h3>📋 Ficha</h3><button class="btn-back" onclick="cambiarPantalla('pastor-congregacion')">← Volver</button></div></div>`;
+      }
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>📋 Contacto con: ${sanitizar(t.nombre || '')}</h3>
+          <button class="btn-back" onclick="cambiarPantalla('pastor-congregacion')">← Volver</button>
+        </div>
+        <div class="nuevo-form">
+          <div class="input-group">
+            <label>Tipo de contacto</label>
+            <select id="pastor-cong-ficha-tipo">
+              <option value="whatsapp">💬 WhatsApp</option>
+              <option value="llamada">📞 Llamada</option>
+              <option value="visita">🏠 Visita personal</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Versículo compartido (opcional)</label>
+            <input type="text" id="pastor-cong-ficha-versiculo" placeholder="Ej: Salmo 23:1" />
+          </div>
+          <div class="input-group">
+            <label>Estado de ánimo</label>
+            <select id="pastor-cong-ficha-animo">
+              <option value="muy_bien">😊 Muy bien</option>
+              <option value="animado">🙂 Animado</option>
+              <option value="desanimado">😐 Desanimado</option>
+              <option value="decaido">😔 Decaído</option>
+              <option value="con_miedo">😨 Con miedo</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Motivo de oración</label>
+            <textarea id="pastor-cong-ficha-oracion" rows="2" style="width:100%; background:var(--gris-medio); border:none; border-radius:8px; padding:12px; color:white"></textarea>
+          </div>
+          <div class="input-group">
+            <label>Notas adicionales</label>
+            <textarea id="pastor-cong-ficha-notas" rows="2" style="width:100%; background:var(--gris-medio); border:none; border-radius:8px; padding:12px; color:white"></textarea>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:20px">
+            <input type="checkbox" id="pastor-cong-ficha-por-ausencia" />
+            <span style="font-size:13px">⚠️ Este contacto es porque faltó a algún servicio</span>
+          </label>
+          <button class="btn-primary" onclick="guardarFichaPastorCongregante()">✅ Guardar contacto</button>
+        </div>
+      </div>`;
+    }
+
+    function renderPastorGrupos() {
+      const grupos = state.gruposDC || [];
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>🏠 Grupos DC</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+        
+        <button class="btn-primary" onclick="mostrarModalCrearGrupo()" style="margin-bottom:16px">+ Crear nuevo grupo</button>
+        
+        ${grupos.length === 0 ?
+          `<div class="coming-soon">
+            <div class="big-icon">🏠</div>
+            <h3>No hay grupos creados</h3>
+            <p>Creá tu primer grupo de discipulado</p>
+          </div>` :
+          grupos.map(g => `
+            <div class="info-section" style="margin-bottom:12px">
+              <div class="info-row">
+                <span class="label">${g.nombre}</span>
+                <span style="color:var(--rojo-claro);font-size:12px">${g.dia_reunion || 'Sin día'} ${g.hora_reunion || ''}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Líder</span>
+                <span>${g.lider?.nombre || 'Sin asignar'}</span>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:12px">
+                <button class="btn-secondary" style="margin-top:0; padding:10px" onclick="asignarLiderGrupo('${g.id}')">👥 Asignar líder</button>
+                <button class="btn-secondary" style="margin-top:0; padding:10px" onclick="asignarMiembrosGrupo('${g.id}', '${g.nombre}')">➕ Agregar miembros</button>
+              </div>
+            </div>
+          `).join('')
+        }
+      </div>
+    `;
+    }
+
+    window.mostrarModalCrearGrupo = function () {
+      const nombre = prompt('Nombre del grupo DC:');
+      if (!nombre) return;
+      const dia = prompt('Día de reunión (ej: Martes):');
+      const hora = prompt('Hora de reunión (ej: 19:30):');
+
+      sb.from('grupos_dc').insert({ nombre, dia_reunion: dia, hora_reunion: hora })
+        .then(() => {
+          mostrarToast(`✅ Grupo "${nombre}" creado`);
+          cargarDatosPastor();
+          cambiarPantalla('pastor-grupos');
+        });
+    };
+
+    window.asignarLiderGrupo = async function (grupoId) {
+      let lideres = state.lideres || [];
+      lideres = lideres.filter(l => {
+        const rol = String(l.rol || '').toLowerCase();
+        return rol === 'lider_dc' || rol === 'liderdc' || rol === 'lider dc' || rol === 'nangareko';
+      });
+
+      // Si todavía no hay, recargar desde DB (puede que state.lideres esté vacío/stale)
+      if (lideres.length === 0) {
+        try {
+          const { data, error } = await withTimeout(
+            sb.from('usuarios').select('id, nombre, email, rol').in('rol', ['lider_dc', 'nangareko']).order('nombre', { ascending: true }),
+            20000,
+            'cargar líderes dc'
+          );
+          if (error) throw error;
+          lideres = data || [];
+        } catch (e) {
+          console.error('Error al cargar líderes DC:', e);
+          mostrarToast('⚠️ No se pudieron cargar líderes DC', 'error');
+          return;
+        }
+      }
+
+      if (lideres.length === 0) {
+        mostrarToast('No hay líderes DC registrados', 'error');
+        return;
+      }
+
+      const lista = lideres.map((l, i) => `${i + 1}. ${l.nombre} (${l.email})`).join('\n');
+      const seleccion = prompt(`Seleccioná un líder para este grupo:\n\n${lista}\n\nEscribí el número:`);
+      const idx = parseInt(seleccion) - 1;
+      if (idx >= 0 && idx < lideres.length) {
+        await sb.from('grupos_dc').update({ lider_id: lideres[idx].id }).eq('id', grupoId);
+        mostrarToast(`✅ Líder asignado`);
+        await cargarDatosPastor();
+        cambiarPantalla('pastor-grupos');
+      }
+    };
+
+    window.asignarMiembrosGrupo = async function (grupoId, grupoNombre) {
+      const miembrosDisponibles = state.congregantes.filter(c => !c.grupo_dc_id);
+      if (miembrosDisponibles.length === 0) {
+        mostrarToast('No hay miembros disponibles para asignar', 'error');
+        return;
+      }
+
+      const lista = miembrosDisponibles.map((m, i) => `${i + 1}. ${m.nombre} (${m.estado})`).join('\n');
+      const seleccion = prompt(`Asignar miembro a "${grupoNombre}":\n\n${lista}\n\nEscribí el número (0 para terminar):`);
+      const idx = parseInt(seleccion) - 1;
+      if (idx >= 0 && idx < miembrosDisponibles.length) {
+        await sb.from('congregantes').update({ grupo_dc_id: grupoId }).eq('id', miembrosDisponibles[idx].id);
+        mostrarToast(`✅ ${miembrosDisponibles[idx].nombre} asignado al grupo`);
+        await cargarCongregantes();
+        await cargarDatosPastor();
+        asignarMiembrosGrupo(grupoId, grupoNombre);
+      }
+    };
+
+    window.verDetalleLider = function (usuarioId) {
+      state.pastorLiderSeleccionadoId = usuarioId;
+      state.pastorFichasLider = [];
+      cambiarPantalla('pastor-lider-detalle');
+      abrirFichaPastorLider(usuarioId, ((state.lideres || []).find(u => u.id === usuarioId)?.nombre || ''));
+    };
+
+    window.pastorAgregarLider = async function () {
+      const email = (prompt('Email del líder (debe tener cuenta creada):') || '').trim();
+      if (!email) return;
+      const rol = (prompt('Rol a asignar (hory / nangareko / lider_dc):') || '').trim();
+      if (!rol) return;
+
+      try {
+        const { data, error } = await withTimeout(
+          sb.from('usuarios').select('*').eq('email', email).maybeSingle(),
+          20000,
+          'buscar líder por email'
+        );
+        if (error) throw error;
+        if (!data) {
+          mostrarToast('⚠️ No existe un usuario con ese email. Esa persona debe registrarse primero.', 'error');
+          return;
+        }
+        const { error: upErr } = await withTimeout(
+          sb.from('usuarios').update({ rol }).eq('id', data.id),
+          20000,
+          'actualizar rol'
+        );
+        if (upErr) throw upErr;
+        mostrarToast('✅ Líder actualizado');
+        await cargarDatosPastor();
+        render();
+      } catch (e) {
+        console.error('Error al agregar líder:', e);
+        mostrarToast('⚠️ No se pudo agregar/actualizar el líder: ' + (e?.message || 'sin detalle'), 'error');
+      }
+    };
+
+    window.abrirFichaPastorLider = async function (liderId, liderNombre) {
+      state.pastorFichaTarget = { tipo: 'lider', id: liderId, nombre: liderNombre };
+      try {
+        const { data, error } = await withTimeout(
+          sb.from('fichas_pastor').select('*').eq('lider_id', liderId).order('created_at', { ascending: false }).limit(10),
+          20000,
+          'cargar fichas pastor'
+        );
+        if (error) throw error;
+        state.pastorFichasLider = data || [];
+      } catch (e) {
+        console.error('Error al cargar fichas_pastor:', e);
+        state.pastorFichasLider = [];
+      }
+      cambiarPantalla('pastor-lider-fichas');
+    };
+
+    window.guardarFichaPastorLider = async function () {
+      const t = state.pastorFichaTarget;
+      if (!t || t.tipo !== 'lider') return;
+      const tipo = document.getElementById('pastor-ficha-tipo')?.value;
+      const versiculo = document.getElementById('pastor-ficha-versiculo')?.value;
+      const estadoAnimo = document.getElementById('pastor-ficha-animo')?.value;
+      const motivoOracion = document.getElementById('pastor-ficha-oracion')?.value;
+      const notas = document.getElementById('pastor-ficha-notas')?.value;
+      const esPorAusencia = document.getElementById('pastor-ficha-por-ausencia')?.checked || false;
+
+      try {
+        const { error } = await withTimeout(
+          sb.from('fichas_pastor').insert({
+            lider_id: t.id,
+            pastor_id: state.usuario.id,
+            tipo_contacto: tipo,
+            versiculo_compartido: versiculo || null,
+            estado_animo: estadoAnimo,
+            motivo_oracion: motivoOracion || null,
+            notas_adicionales: notas || null,
+            es_por_ausencia: esPorAusencia
+          }),
+          20000,
+          'guardar ficha pastor'
+        );
+        if (error) throw error;
+        mostrarToast('✅ Contacto registrado correctamente');
+        await abrirFichaPastorLider(t.id, t.nombre);
+      } catch (e) {
+        console.error('Error al guardar ficha pastor líder:', e);
+        mostrarToast('⚠️ No se pudo guardar: ' + (e?.message || 'sin detalle'), 'error');
+      }
+    };
+
+    window.abrirFichaPastorCongregante = function (congreganteId, congreganteNombre) {
+      state.pastorFichaTarget = { tipo: 'congregante', id: congreganteId, nombre: congreganteNombre };
+      cambiarPantalla('pastor-congregante-fichas');
+    };
+
+    window.guardarFichaPastorCongregante = async function () {
+      const t = state.pastorFichaTarget;
+      if (!t || t.tipo !== 'congregante') return;
+      const tipo = document.getElementById('pastor-cong-ficha-tipo')?.value;
+      const versiculo = document.getElementById('pastor-cong-ficha-versiculo')?.value;
+      const estadoAnimo = document.getElementById('pastor-cong-ficha-animo')?.value;
+      const motivoOracion = document.getElementById('pastor-cong-ficha-oracion')?.value;
+      const notas = document.getElementById('pastor-cong-ficha-notas')?.value;
+      const esPorAusencia = document.getElementById('pastor-cong-ficha-por-ausencia')?.checked || false;
+
+      try {
+        const { error } = await withTimeout(
+          sb.from('fichas_pastor_congregantes').insert({
+            congregante_id: t.id,
+            pastor_id: state.usuario.id,
+            tipo_contacto: tipo,
+            versiculo_compartido: versiculo || null,
+            estado_animo: estadoAnimo,
+            motivo_oracion: motivoOracion || null,
+            notas_adicionales: notas || null,
+            es_por_ausencia: esPorAusencia
+          }),
+          20000,
+          'guardar ficha pastor congregante'
+        );
+        if (error) throw error;
+        mostrarToast('✅ Contacto registrado correctamente');
+        state.pastorFichaTarget = null;
+        cambiarPantalla('pastor-congregacion');
+      } catch (e) {
+        console.error('Error al guardar ficha pastor congregante:', e);
+        mostrarToast('⚠️ No se pudo guardar: ' + (e?.message || 'sin detalle'), 'error');
+      }
+    };
+
+    window.verHistorialFichasPastorCongregante = async function (congreganteId, congreganteNombre) {
+      try {
+        const { data, error } = await withTimeout(
+          sb.from('fichas_pastor_congregantes').select('*').eq('congregante_id', congreganteId).order('created_at', { ascending: false }).limit(5),
+          20000,
+          'cargar historial fichas pastor congregante'
+        );
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          mostrarToast(`📭 ${congreganteNombre} - No hay contactos registrados aún`);
+          return;
+        }
+        const resumen = data.map(f => `📅 ${new Date(f.created_at).toLocaleDateString()}: ${f.tipo_contacto || 'contacto'}`).join('\n');
+        alert(`📜 Historial de ${congreganteNombre}:\n\n${resumen}`);
+      } catch (e) {
+        console.error('Error al cargar historial fichas pastor congregante:', e);
+        mostrarToast('⚠️ No se pudo cargar el historial: ' + (e?.message || 'sin detalle'), 'error');
+      }
+    };
+
+    window.actualizarBusquedaCongregacion = function (valor) {
+      state.pastorCongregacionBusqueda = valor;
+      render();
+    };
+
+    function actualizarCongreganteEnColecciones(congreganteId, patch) {
+      const colecciones = [
+        state.congregantes,
+        state.misCuidados,
+        state.alertasNuevos,
+        state.miembrosGrupo
+      ];
+
+      for (const col of colecciones) {
+        if (!Array.isArray(col)) continue;
+        const idx = col.findIndex(c => c?.id === congreganteId);
+        if (idx >= 0) col[idx] = { ...col[idx], ...patch };
+      }
+    }
+
+    window.actualizarEstadoCongregante = async function (congreganteId, nuevoEstado) {
+      try {
+        const { error } = await withTimeout(
+          sb.from('congregantes').update({ estado: nuevoEstado }).eq('id', congreganteId),
+          12000,
+          'actualizar estado'
+        );
+        if (error) throw error;
+
+        actualizarCongreganteEnColecciones(congreganteId, { estado: nuevoEstado });
+        mostrarToast('✅ Estado actualizado');
+        render();
+      } catch (e) {
+        console.error('Error al actualizar estado:', e);
+        mostrarToast('⚠️ No se pudo actualizar el estado: ' + (e?.message || 'sin detalle'), 'error');
+        await cargarCongregantes();
+        render();
+      }
+    };
+
+    window.actualizarGrupoDCCongregante = async function (congreganteId, grupoIdValue) {
+      const grupo_dc_id = grupoIdValue ? grupoIdValue : null;
+      try {
+        const { error } = await withTimeout(
+          sb.from('congregantes').update({ grupo_dc_id }).eq('id', congreganteId),
+          12000,
+          'actualizar grupo dc'
+        );
+        if (error) throw error;
+
+        actualizarCongreganteEnColecciones(congreganteId, { grupo_dc_id });
+        mostrarToast('✅ Grupo DC actualizado');
+        render();
+      } catch (e) {
+        console.error('Error al actualizar grupo dc:', e);
+        mostrarToast('⚠️ No se pudo actualizar el grupo DC: ' + (e?.message || 'sin detalle'), 'error');
+        await cargarCongregantes();
+        render();
+      }
+    };
+
+    window.volverNangarekoSeleccion = function () {
+      state.congreganteSeleccionado = null;
+      render();
+    };
+
+    window.actualizarRolUsuario = async function (usuarioId, nuevoRol) {
+      try {
+        const { error } = await withTimeout(
+          sb.from('usuarios').update({ rol: nuevoRol }).eq('id', usuarioId),
+          12000,
+          'actualizar rol'
+        );
+        if (error) throw error;
+
+        const idx = (state.lideres || []).findIndex(u => u.id === usuarioId);
+        if (idx >= 0) state.lideres[idx].rol = nuevoRol;
+        mostrarToast('✅ Rol actualizado');
+      } catch (e) {
+        console.error('Error al actualizar rol:', e);
+        mostrarToast('⚠️ No se pudo actualizar el rol', 'error');
+        await cargarDatosPastor();
+        render();
+      }
+    };
+
+    function renderPastorCalendario() {
+      const grupos = state.gruposDC || [];
+      const eventos = (() => {
+        try {
+          const raw = localStorage.getItem('pastoreo_cal_events');
+          const parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>📅 Calendario</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Servicios</h3>
+          <div class="info-row"><span class="label">Domingo</span><span>09:00</span></div>
+          <div class="info-row"><span class="label">Miércoles</span><span>19:30</span></div>
+        </div>
+
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Grupos DC</h3>
+          ${grupos.length === 0 ?
+            '<div class="info-row"><span class="label">No hay grupos creados</span></div>' :
+            grupos.map(g => `
+              <div class="info-row">
+                <span class="label">${sanitizar(g.nombre)}</span>
+                <span style="font-size:12px;color:var(--texto-suave)">${sanitizar(g.dia_reunion || 'Sin día')} ${sanitizar(g.hora_reunion || '')}</span>
+              </div>
+            `).join('')
+          }
+        </div>
+
+        <div class="info-section">
+          <h3>Eventos (local)</h3>
+          <button class="btn-primary" style="margin-top:0;margin-bottom:12px" onclick="agregarEventoLocal()">+ Agregar evento</button>
+          ${eventos.length === 0 ?
+            '<div class="info-row"><span class="label">No hay eventos</span></div>' :
+            eventos.map(e => `
+              <div class="info-row">
+                <span class="label">${sanitizar(e.titulo || 'Evento')}</span>
+                <span style="font-size:12px;color:var(--texto-suave)">${sanitizar(e.fecha || '')} ${sanitizar(e.hora || '')}</span>
+              </div>
+              <button class="btn-secondary" style="margin-top:8px" onclick="eliminarEventoLocal('${sanitizar(e.id)}')">Eliminar</button>
+            `).join('')
+          }
+        </div>
+      </div>
+    `;
+    }
+
+    window.agregarEventoLocal = function () {
+      const titulo = prompt('Título del evento:');
+      if (!titulo) return;
+      const fecha = prompt('Fecha (YYYY-MM-DD):');
+      if (!fecha) return;
+      const hora = prompt('Hora (opcional, ej: 19:30):') || '';
+
+      let eventos = [];
+      try {
+        eventos = JSON.parse(localStorage.getItem('pastoreo_cal_events') || '[]');
+        if (!Array.isArray(eventos)) eventos = [];
+      } catch {
+        eventos = [];
+      }
+
+      eventos.unshift({ id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), titulo, fecha, hora });
+      localStorage.setItem('pastoreo_cal_events', JSON.stringify(eventos));
+      render();
+    };
+
+    window.eliminarEventoLocal = function (eventId) {
+      let eventos = [];
+      try {
+        eventos = JSON.parse(localStorage.getItem('pastoreo_cal_events') || '[]');
+        if (!Array.isArray(eventos)) eventos = [];
+      } catch {
+        eventos = [];
+      }
+      eventos = eventos.filter(e => e?.id !== eventId);
+      localStorage.setItem('pastoreo_cal_events', JSON.stringify(eventos));
+      render();
+    };
+
+    function renderPastorAlertas() {
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>🔔 Alertas</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+        <div class="coming-soon">
+          <div class="big-icon">🚧</div>
+          <h3>Próximamente</h3>
+          <p>Todas las notificaciones</p>
+        </div>
+      </div>
+    `;
+    }
+
+    // ============================================
+    // SECCIÓN ÑANGAREKO DASHBOARD & LOGIC
+    // ============================================
+
+    function renderHomeNangareko() {
+      const u = state.usuario;
+      const hora = new Date().getHours();
+      const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
+
+      const totalCuidados = state.misCuidados?.length || 0;
+      const alertasPendientes = state.alertasNuevos?.length || 0;
+      const contactos = state.contactosSemana || 0;
+
+      return `
+      <div class="main-content">
+        <div class="welcome-banner">
+          <h2>${saludo}, ${u.nombre.split(' ')[0]} 👋</h2>
+          <p>Panel del <strong>Ñangareko</strong> — Cuidado de almas</p>
+        </div>
+        
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-numero">${totalCuidados}</div>
+            <div class="stat-label">A mi cargo</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-numero" style="color:var(--dorado)">${alertasPendientes}</div>
+            <div class="stat-label">Alertas pendientes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-numero" style="color:var(--verde)">${contactos}</div>
+            <div class="stat-label">Contactos esta semana</div>
+          </div>
+        </div>
+        
+        <div class="menu-grid">
+          <div class="menu-card menu-card-full" onclick="cambiarPantalla('nangareko-alertas')">
+            <div class="icon">🚨</div>
+            <div class="card-title">Nuevos ingresos</div>
+            <div class="card-desc">${alertasPendientes > 0 ? `${alertasPendientes} personas esperan asignación` : 'No hay nuevos ingresos pendientes'}</div>
+          </div>
+          <div class="menu-card menu-card-full" onclick="cambiarPantalla('nangareko-cuidados')">
+            <div class="icon">🤝</div>
+            <div class="card-title">Mis cuidados</div>
+            <div class="card-desc">${totalCuidados} personas a tu cargo</div>
+          </div>
+          <div class="menu-card" onclick="cambiarPantalla('nangareko-fichas')">
+            <div class="icon">📋</div>
+            <div class="card-title">Registrar contacto</div>
+            <div class="card-desc">Nueva ficha de seguimiento</div>
+          </div>
+        </div>
+        
+        <div class="info-section">
+          <h3>📝 Últimos contactos</h3>
+          <div id="ultimos-contactos">
+            <div style="text-align:center;color:var(--texto-suave);padding:16px">Cargando...</div>
+          </div>
+        </div>
+      </div>
+    `;
+    }
+
+    async function cargarDatosNangareko() {
+      if (!state.usuario || state.usuario.rol !== 'nangareko') return;
+
+      const userId = state.usuario.id;
+
+      const [
+        misCuidadosRes,
+        nuevosSinAsignarRes,
+        gruposRes
+      ] = await Promise.all([
+        sb.from('congregantes')
+          .select('*')
+          .eq('nangareko_id', userId)
+          .order('created_at', { ascending: false }),
+        sb.from('congregantes')
+          .select('*')
+          .is('nangareko_id', null)
+          .eq('estado', 'nuevo')
+          .order('created_at', { ascending: false }),
+        sb.from('grupos_dc').select('id, nombre').order('nombre', { ascending: true })
+      ]);
+
+      state.misCuidados = misCuidadosRes?.data || [];
+      state.alertasNuevos = nuevosSinAsignarRes?.data || [];
+
+      if (gruposRes?.error) {
+        console.error('Error al cargar grupos DC (Ñangareko):', gruposRes.error);
+      } else {
+        state.gruposDC = gruposRes.data || [];
+      }
+
+      const fechaLimite = new Date();
+      fechaLimite.setDate(fechaLimite.getDate() - 7);
+      const fechaStr = fechaLimite.toISOString().split('T')[0];
+
+      const { data: contactos } = await sb.from('fichas_nangareko')
+        .select('id', { count: 'exact' })
+        .eq('nangareko_id', userId)
+        .gte('created_at', fechaStr);
+      state.contactosSemana = contactos?.length || 0;
+
+      const { data: ultimosContactos } = await sb.from('fichas_nangareko')
+        .select('*, congregantes(nombre)')
+        .eq('nangareko_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      const container = document.getElementById('ultimos-contactos');
+      if (container) {
+        if (ultimosContactos && ultimosContactos.length > 0) {
+          container.innerHTML = ultimosContactos.map(f => `
+          <div class="info-row">
+            <span class="label">${f.congregantes?.nombre || 'Desconocido'}</span>
+            <span style="font-size:12px">${f.tipo_contacto} · ${new Date(f.created_at).toLocaleDateString()}</span>
+          </div>
+        `).join('');
+        } else {
+          container.innerHTML = '<div class="info-row"><span class="label">No hay contactos registrados aún</span></div>';
+        }
+      }
+    }
+
+    function renderNangarekoAlertas() {
+      const alertas = state.alertasNuevos || [];
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>🚨 Nuevos ingresos</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+        
+        ${alertas.length === 0 ?
+          `<div class="coming-soon">
+            <div class="big-icon">✅</div>
+            <h3>No hay pendientes</h3>
+            <p>Todos los nuevos ingresos han sido asignados</p>
+          </div>` :
+          `<div style="margin-bottom:16px">
+            <p style="color:var(--texto-suave);font-size:13px">${alertas.length} persona(s) esperan ser asignadas a un cuidador</p>
+          </div>
+          ${alertas.map(c => `
+            <div class="info-section" style="margin-bottom:12px">
+              <div class="info-row">
+                <span class="label">Nombre</span>
+                <span style="font-weight:500">${c.nombre}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Fecha ingreso</span>
+                <span>${new Date(c.created_at).toLocaleDateString()}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Teléfono</span>
+                <span>${c.telefono || 'No registrado'}</span>
+              </div>
+              <button class="btn-primary" style="margin-top:12px" onclick="asignarACargo('${c.id}', '${c.nombre}')">
+                🤝 Tomar a mi cargo
+              </button>
+            </div>
+          `).join('')}
+        `
+        }
+      </div>
+    `;
+    }
+
+    window.asignarACargo = async function (congreganteId, nombre) {
+      const userId = state.usuario.id;
+
+      const { error } = await sb.from('congregantes')
+        .update({ nangareko_id: userId, estado: 'en_proceso' })
+        .eq('id', congreganteId);
+
+      if (error) {
+        mostrarToast('Error al asignar', 'error');
+        return;
+      }
+
+      await sb.from('fichas_nangareko').insert({
+        congregante_id: congreganteId,
+        nangareko_id: userId,
+        tipo_contacto: 'whatsapp',
+        notas_adicionales: 'Primer contacto - Asignación inicial'
+      });
+
+      mostrarToast(`✅ ${nombre} ahora está a tu cargo`);
+
+      await cargarDatosNangareko();
+      await cargarCongregantes();
+      cambiarPantalla('home');
+    };
+
+    function renderNangarekoCuidados() {
+      const cuidados = state.misCuidados || [];
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>🤝 Mis cuidados</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+        
+        ${cuidados.length === 0 ?
+          `<div class="coming-soon">
+            <div class="big-icon">👥</div>
+            <h3>Aún no tienes personas a cargo</h3>
+            <p>Asigna nuevos ingresos desde el panel de alertas</p>
+          </div>` :
+          cuidados.map(c => `
+            <div class="info-section" style="margin-bottom:12px">
+              <div class="info-row">
+                <span class="label">${c.nombre}</span>
+                <span class="estado-${c.estado}">${estadoLabel(c.estado)}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Teléfono</span>
+                <span>${c.telefono || 'No registrado'}</span>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:12px">
+                <button class="btn-primary" style="flex:1; padding:10px" onclick="abrirFichaContacto('${c.id}', '${c.nombre}')">
+                  📝 Registrar contacto
+                </button>
+                <button class="btn-primary" style="flex:1; padding:10px; background:var(--gris-medio)" onclick="verHistorialFichas('${c.id}')">
+                  📜 Historial
+                </button>
+              </div>
+            </div>
+          `).join('')
+        }
+      </div>
+    `;
+    }
+
+    function renderNangarekoFichas(congreganteId = null, congreganteNombre = null) {
+      const targetId = congreganteId || state.congreganteSeleccionado?.id;
+      const targetNombre = congreganteNombre || state.congreganteSeleccionado?.nombre;
+
+      const grupos = state.gruposDC || [];
+      const congregante = targetId ?
+        ((state.misCuidados || []).find(c => c.id === targetId) || (state.congregantes || []).find(c => c.id === targetId)) :
+        null;
+
+      if (!targetId) {
+        const cuidados = state.misCuidados || [];
+        return `
+        <div class="main-content">
+          <div class="section-header">
+            <h3>📋 Registrar contacto</h3>
+            <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+          </div>
+          
+          <div class="info-section">
+            <h3>Seleccionar persona</h3>
+            ${cuidados.length === 0 ?
+            '<p style="color:var(--texto-suave)">No tienes personas a cargo</p>' :
+            cuidados.map(c => `
+                <div class="info-row" style="cursor:pointer" onclick="seleccionarCongreganteFicha('${c.id}', '${c.nombre}')">
+                  <span class="label">${c.nombre}</span>
+                  <span style="color:var(--rojo-claro)">→</span>
+                </div>
+              `).join('')
+          }
+          </div>
+        </div>
+      `;
+      }
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>📋 Contacto con: ${targetNombre}</h3>
+          <button class="btn-back" onclick="volverNangarekoSeleccion()">← Volver</button>
+        </div>
+
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Datos</h3>
+          <div class="input-group" style="margin-bottom:12px">
+            <label>Nombre</label>
+            <input type="text" id="edit-nombre" value="${sanitizar(congregante?.nombre || targetNombre || '')}" />
+          </div>
+
+          <div class="input-group" style="margin-bottom:12px">
+            <label>Teléfono</label>
+            <input type="tel" id="edit-telefono" value="${sanitizar(congregante?.telefono || '')}" placeholder="0981 000 000" />
+          </div>
+
+          <div style="text-align:center;margin-bottom:12px">
+            <div class="foto-upload" onclick="document.getElementById('edit-foto-input').click()">
+              <div id="edit-foto-preview">${congregante?.foto_url ? `<img src=\"${congregante.foto_url}\" alt=\"foto\" style=\"width:100%;height:100%;object-fit:cover;border-radius:12px\" />` : '📷'}</div>
+              <span>Foto (opcional)</span>
+            </div>
+            <input type="file" id="edit-foto-input" accept="image/*" style="display:none" onchange="previsualizarFotoEdicion(this)" />
+          </div>
+
+          <div class="info-row">
+            <span class="label">Estado</span>
+            <select style="width:200px" onchange="actualizarEstadoCongregante('${targetId}', this.value)">
+              <option value="nuevo" ${(congregante?.estado || 'nuevo') === 'nuevo' ? 'selected' : ''}>${estadoLabel('nuevo')}</option>
+              <option value="visita" ${(congregante?.estado || '') === 'visita' ? 'selected' : ''}>${estadoLabel('visita')}</option>
+              <option value="en_proceso" ${(congregante?.estado || '') === 'en_proceso' ? 'selected' : ''}>${estadoLabel('en_proceso')}</option>
+              <option value="en_anua" ${(congregante?.estado || '') === 'en_anua' ? 'selected' : ''}>${estadoLabel('en_anua')}</option>
+              <option value="bautizado" ${(congregante?.estado || '') === 'bautizado' ? 'selected' : ''}>${estadoLabel('bautizado')}</option>
+              <option value="en_dc" ${(congregante?.estado || '') === 'en_dc' ? 'selected' : ''}>${estadoLabel('en_dc')}</option>
+              <option value="graduado" ${(congregante?.estado || '') === 'graduado' ? 'selected' : ''}>${estadoLabel('graduado')}</option>
+            </select>
+          </div>
+
+          <div class="info-row">
+            <span class="label">Grupo DC</span>
+            <select style="width:200px" onchange="actualizarGrupoDCCongregante('${targetId}', this.value)">
+              <option value="" ${!congregante?.grupo_dc_id ? 'selected' : ''}>(Sin grupo)</option>
+              ${grupos.map(g => `<option value="${g.id}" ${congregante?.grupo_dc_id === g.id ? 'selected' : ''}>${sanitizar(g.nombre)}</option>`).join('')}
+            </select>
+          </div>
+
+          <button class="btn-primary" style="margin-top:12px" onclick="guardarPerfilCongregante('${targetId}')">💾 Guardar datos</button>
+        </div>
+        
+        <div class="nuevo-form">
+          <div class="input-group">
+            <label>Tipo de contacto</label>
+            <select id="ficha-tipo">
+              <option value="whatsapp">💬 WhatsApp</option>
+              <option value="llamada">📞 Llamada</option>
+              <option value="visita">🏠 Visita personal</option>
+            </select>
+          </div>
+          
+          <div class="input-group">
+            <label>Versículo compartido (opcional)</label>
+            <input type="text" id="ficha-versiculo" placeholder="Ej: Salmo 23:1" />
+          </div>
+          
+          <div class="input-group">
+            <label>Estado de ánimo</label>
+            <select id="ficha-animo">
+              <option value="muy_bien">😊 Muy bien</option>
+              <option value="animado">🙂 Animado</option>
+              <option value="desanimado">😐 Desanimado</option>
+              <option value="decaido">😔 Decaído</option>
+              <option value="con_miedo">😨 Con miedo</option>
+            </select>
+          </div>
+          
+          <div class="input-group">
+            <label>Motivo de oración</label>
+            <textarea id="ficha-oracion" rows="2" style="width:100%; background:var(--gris-medio); border:none; border-radius:8px; padding:12px; color:white"></textarea>
+          </div>
+          
+          <div class="input-group">
+            <label>Notas adicionales</label>
+            <textarea id="ficha-notas" rows="2" style="width:100%; background:var(--gris-medio); border:none; border-radius:8px; padding:12px; color:white"></textarea>
+          </div>
+          
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:20px">
+            <input type="checkbox" id="ficha-por-ausencia" />
+            <span style="font-size:13px">⚠️ Este contacto es porque la persona faltó a algún servicio</span>
+          </label>
+          
+          <button class="btn-primary" onclick="guardarFichaContacto('${targetId}')">✅ Guardar contacto</button>
+        </div>
+      </div>
+    `;
+    }
+
+    window.seleccionarCongreganteFicha = function (id, nombre) {
+      state.congreganteSeleccionado = { id, nombre };
+      cambiarPantalla('nangareko-fichas');
+    };
+
+    window.guardarFichaContacto = async function (congreganteId) {
+      const tipo = document.getElementById('ficha-tipo')?.value;
+      const versiculo = document.getElementById('ficha-versiculo')?.value;
+      const estadoAnimo = document.getElementById('ficha-animo')?.value;
+      const motivoOracion = document.getElementById('ficha-oracion')?.value;
+      const notas = document.getElementById('ficha-notas')?.value;
+      const esPorAusencia = document.getElementById('ficha-por-ausencia')?.checked || false;
+
+      const { error } = await sb.from('fichas_nangareko').insert({
+        congregante_id: congreganteId,
+        nangareko_id: state.usuario.id,
+        tipo_contacto: tipo,
+        versiculo_compartido: versiculo || null,
+        estado_animo: estadoAnimo,
+        motivo_oracion: motivoOracion || null,
+        notas_adicionales: notas || null,
+        es_por_ausencia: esPorAusencia
+      });
+
+      if (error) {
+        mostrarToast('Error al guardar', 'error');
+        return;
+      }
+
+      mostrarToast('✅ Contacto registrado correctamente');
+
+      state.congreganteSeleccionado = null;
+      await cargarDatosNangareko();
+      cambiarPantalla('home');
+    };
+
+    window.abrirFichaContacto = function (id, nombre) {
+      state.congreganteSeleccionado = { id, nombre };
+      cambiarPantalla('nangareko-fichas');
+    };
+
+    window.verHistorialFichas = async function (congreganteId) {
+      const { data: historial } = await sb.from('fichas_nangareko')
+        .select('*')
+        .eq('congregante_id', congreganteId)
+        .order('created_at', { ascending: false });
+
+      const congregante = state.misCuidados?.find(c => c.id === congreganteId);
+      const nombre = congregante?.nombre || 'Desconocido';
+
+      if (!historial || historial.length === 0) {
+        mostrarToast(`📭 ${nombre} - No hay contactos registrados aún`);
+        return;
+      }
+
+      const resumen = historial.slice(0, 5).map(f =>
+        `📅 ${new Date(f.created_at).toLocaleDateString()}: ${f.tipo_contacto} - Ánimo: ${f.estado_animo}`
+      ).join('\n');
+
+      alert(`📜 Historial de ${nombre}:\n\n${resumen}\n\n${historial.length > 5 ? `... y ${historial.length - 5} más` : ''}`);
+    };
+
+    // ============================================
+    // SECCIÓN LÍDER DC DASHBOARD & LOGIC
+    // ============================================
+
+    function renderHomeLiderDC() {
+      const u = state.usuario;
+      const hora = new Date().getHours();
+      const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
+
+      const totalMiembros = state.miembrosGrupo?.length || 0;
+      const tieneGrupo = state.miGrupo !== null;
+      const proximaReunion = state.miGrupo ? `${state.miGrupo.dia_reunion || 'Sin día'} ${state.miGrupo.hora_reunion || ''}` : 'Sin asignar';
+
+      return `
+      <div class="main-content">
+        <div class="welcome-banner">
+          <h2>${saludo}, ${u.nombre.split(' ')[0]} 👋</h2>
+          <p>Panel del <strong>Líder DC</strong> — Discipulado</p>
+        </div>
+        
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-numero">${totalMiembros}</div>
+            <div class="stat-label">Miembros del grupo</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-numero" style="color:var(--dorado)">${tieneGrupo ? '✅' : '❌'}</div>
+            <div class="stat-label">Grupo asignado</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-numero" style="font-size:16px">${proximaReunion}</div>
+            <div class="stat-label">Próxima reunión</div>
+          </div>
+        </div>
+        
+        <div class="menu-grid">
+          <div class="menu-card menu-card-full" onclick="cambiarPantalla('lider-dc-grupo')">
+            <div class="icon">🏠</div>
+            <div class="card-title">Mi grupo DC</div>
+            <div class="card-desc">${totalMiembros} miembros a tu cargo</div>
+          </div>
+          <div class="menu-card menu-card-full" onclick="cambiarPantalla('lider-dc-asistencia')">
+            <div class="icon">✅</div>
+            <div class="card-title">Tomar asistencia</div>
+            <div class="card-desc">Registrá presentes en la reunión</div>
+          </div>
+          <div class="menu-card" onclick="cambiarPantalla('lider-dc-fichas')">
+            <div class="icon">📋</div>
+            <div class="card-title">Registrar contacto</div>
+            <div class="card-desc">Ficha de seguimiento</div>
+          </div>
+        </div>
+        
+        <div class="info-section">
+          <h3>📝 Últimos contactos del grupo</h3>
+          <div id="ultimos-contactos-dc">
+            <div style="text-align:center;color:var(--texto-suave);padding:16px">Cargando...</div>
+          </div>
+        </div>
+      </div>
+    `;
+    }
+
+    async function cargarDatosLiderDC() {
+      if (!state.usuario || state.usuario.rol !== 'lider_dc') return;
+
+      const userId = state.usuario.id;
+
+      const { data: grupo } = await sb.from('grupos_dc')
+        .select('*')
+        .eq('lider_id', userId)
+        .single();
+      state.miGrupo = grupo || null;
+
+      if (state.miGrupo) {
+        const { data: miembros } = await sb.from('congregantes')
+          .select('*')
+          .eq('grupo_dc_id', state.miGrupo.id)
+          .order('nombre');
+        state.miembrosGrupo = miembros || [];
+      } else {
+        state.miembrosGrupo = [];
+      }
+
+      const { data: ultimosContactos } = await sb.from('fichas_dc')
+        .select('*, congregantes(nombre)')
+        .eq('lider_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      const container = document.getElementById('ultimos-contactos-dc');
+      if (container) {
+        if (ultimosContactos && ultimosContactos.length > 0) {
+          container.innerHTML = ultimosContactos.map(f => `
+          <div class="info-row">
+            <span class="label">${f.congregantes?.nombre || 'Desconocido'}</span>
+            <span style="font-size:12px">${f.tipo_contacto} · ${new Date(f.created_at).toLocaleDateString()}</span>
+          </div>
+        `).join('');
+        } else {
+          container.innerHTML = '<div class="info-row"><span class="label">No hay contactos registrados aún</span></div>';
+        }
+      }
+    }
+
+    function renderLiderDCGrupo() {
+      const miembros = state.miembrosGrupo || [];
+      const grupo = state.miGrupo;
+
+      if (!grupo) {
+        return `
+        <div class="main-content">
+          <div class="section-header">
+            <h3>🏠 Mi grupo DC</h3>
+            <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+          </div>
+          <div class="coming-soon">
+            <div class="big-icon">⚠️</div>
+            <h3>Aún no tienes un grupo asignado</h3>
+            <p>El pastor te asignará un grupo de discipulado</p>
+          </div>
+        </div>
+      `;
+      }
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>🏠 ${grupo.nombre}</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+        
+        <div class="info-section">
+          <div class="info-row">
+            <span class="label">Día de reunión</span>
+            <span>${grupo.dia_reunion || 'No definido'}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Hora</span>
+            <span>${grupo.hora_reunion || 'No definida'}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Miembros</span>
+            <span>${miembros.length}</span>
+          </div>
+        </div>
+        
+        <h3 style="margin:16px 0 12px 0; font-size:16px">📋 Lista de miembros</h3>
+        ${miembros.length === 0 ?
+          '<div class="info-section"><div class="info-row"><span class="label">No hay miembros asignados aún</span></div></div>' :
+          miembros.map(m => `
+            <div class="info-section" style="margin-bottom:12px">
+              <div class="info-row">
+                <span class="label">${m.nombre}</span>
+                <span class="estado-${m.estado}">${estadoLabel(m.estado)}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Teléfono</span>
+                <span>${m.telefono || 'No registrado'}</span>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:12px">
+                <button class="btn-primary" style="flex:1; padding:10px" onclick="abrirFichaDC('${m.id}', '${m.nombre}')">
+                  📝 Registrar contacto
+                </button>
+                <button class="btn-primary" style="flex:1; padding:10px; background:var(--gris-medio)" onclick="verHistorialFichasDC('${m.id}')">
+                  📜 Historial
+                </button>
+              </div>
+            </div>
+          `).join('')
+        }
+      </div>
+    `;
+    }
+
+    function renderLiderDCAsistencia() {
+      const miembros = state.miembrosGrupo || [];
+      const hoy = new Date().toISOString().split('T')[0];
+
+      if (miembros.length === 0) {
+        return `
+        <div class="main-content">
+          <div class="section-header">
+            <h3>✅ Tomar asistencia</h3>
+            <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+          </div>
+          <div class="coming-soon">
+            <div class="big-icon">👥</div>
+            <h3>No hay miembros en tu grupo</h3>
+            <p>Espera a que el pastor asigne miembros</p>
+          </div>
+        </div>
+      `;
+      }
+
+      const presentes = Object.values(state.asistenciaDCHoy).filter(Boolean).length;
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>✅ Asistencia al grupo</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+        
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-numero">${miembros.length}</div>
+            <div class="stat-label">Total</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-numero" style="color:var(--verde)">${presentes}</div>
+            <div class="stat-label">Presentes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-numero" style="color:var(--rojo-claro)">${miembros.length - presentes}</div>
+            <div class="stat-label">Ausentes</div>
+          </div>
+        </div>
+        
+        <div class="info-section">
+          <div class="info-row">
+            <span class="label">Fecha</span>
+            <span>${new Date().toLocaleDateString()}</span>
+          </div>
+        </div>
+        
+        ${miembros.map(m => {
+        const presente = state.asistenciaDCHoy[m.id] || false;
+        return `
+            <div class="congregante-item ${presente ? 'presente' : ''}" id="dc-item-${m.id}">
+              <div class="congregante-left">
+                <div>
+                  <div class="congregante-nombre">${m.nombre}</div>
+                  <div class="congregante-estado estado-${m.estado}">${estadoLabel(m.estado)}</div>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" ${presente ? 'checked' : ''} onchange="toggleAsistenciaDC('${m.id}', this.checked)" />
+                <span class="slider"></span>
+              </label>
+            </div>
+          `;
+      }).join('')}
+        
+        <button class="btn-primary" onclick="guardarAsistenciaDC()" style="margin-top:20px">💾 Guardar asistencia</button>
+      </div>
+    `;
+    }
+
+    window.toggleAsistenciaDC = function (congreganteId, presente) {
+      state.asistenciaDCHoy[congreganteId] = presente;
+
+      const item = document.getElementById(`dc-item-${congreganteId}`);
+      if (item) {
+        if (presente) {
+          item.classList.add('presente');
+        } else {
+          item.classList.remove('presente');
+        }
+      }
+
+      const presentes = Object.values(state.asistenciaDCHoy).filter(Boolean).length;
+      const statsCards = document.querySelectorAll('.stats-row .stat-card');
+      if (statsCards.length >= 3) {
+        const presentesCard = statsCards[1]?.querySelector('.stat-numero');
+        const ausentesCard = statsCards[2]?.querySelector('.stat-numero');
+        if (presentesCard) presentesCard.textContent = presentes;
+        if (ausentesCard) ausentesCard.textContent = (state.miembrosGrupo?.length || 0) - presentes;
+      }
+    };
+
+    window.guardarAsistenciaDC = async function () {
+      const hoy = new Date().toISOString().split('T')[0];
+      let errores = 0;
+
+      for (const [congreganteId, presente] of Object.entries(state.asistenciaDCHoy)) {
+        const { error } = await sb.from('asistencias').upsert({
+          congregante_id: congreganteId,
+          tipo_servicio: 'dc',
+          fecha: hoy,
+          presente: presente,
+          registrado_por: state.usuario.id
+        }, { onConflict: 'congregante_id,tipo_servicio,fecha' });
+
+        if (error) errores++;
+      }
+
+      if (errores > 0) {
+        mostrarToast(`⚠️ ${errores} errores al guardar`, 'error');
+      } else {
+        mostrarToast('✅ Asistencia guardada correctamente');
+        cambiarPantalla('home');
+      }
+    };
+
+    function renderLiderDCFichas(congreganteId = null, congreganteNombre = null) {
+      const targetId = congreganteId || state.liderDCSeleccionado?.id;
+      const targetNombre = congreganteNombre || state.liderDCSeleccionado?.nombre;
+
+      if (!targetId) {
+        const miembros = state.miembrosGrupo || [];
+        return `
+        <div class="main-content">
+          <div class="section-header">
+            <h3>📋 Registrar contacto</h3>
+            <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+          </div>
+          
+          <div class="info-section">
+            <h3>Seleccionar persona</h3>
+            ${miembros.length === 0 ?
+            '<p style="color:var(--texto-suave)">No hay miembros en tu grupo</p>' :
+            miembros.map(m => `
+                <div class="info-row" style="cursor:pointer" onclick="seleccionarMiembroFichaDC('${m.id}', '${m.nombre}')">
+                  <span class="label">${m.nombre}</span>
+                  <span style="color:var(--rojo-claro)">→</span>
+                </div>
+              `).join('')
+          }
+          </div>
+        </div>
+      `;
+      }
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>📋 Contacto con: ${targetNombre}</h3>
+          <button class="btn-back" onclick="cambiarPantalla('lider-dc-fichas')">← Volver</button>
+        </div>
+        
+        <div class="nuevo-form">
+          <div class="input-group">
+            <label>Tipo de contacto</label>
+            <select id="dc-ficha-tipo">
+              <option value="whatsapp">💬 WhatsApp</option>
+              <option value="llamada">📞 Llamada</option>
+              <option value="visita">🏠 Visita personal</option>
+            </select>
+          </div>
+          
+          <div class="input-group">
+            <label>Versículo compartido</label>
+            <input type="text" id="dc-ficha-versiculo" placeholder="Ej: Juan 3:16" />
+          </div>
+          
+          <div class="input-group">
+            <label>Vida espiritual (comentarios)</label>
+            <textarea id="dc-ficha-espiritual" rows="2" style="width:100%; background:var(--gris-medio); border:none; border-radius:8px; padding:12px; color:white" placeholder="Cómo va su caminar con Dios..."></textarea>
+          </div>
+          
+          <div class="input-group">
+            <label>Áreas de mejora</label>
+            <textarea id="dc-ficha-mejora" rows="2" style="width:100%; background:var(--gris-medio); border:none; border-radius:8px; padding:12px; color:white" placeholder="En qué necesita crecer..."></textarea>
+          </div>
+          
+          <div class="input-group">
+            <label>Notas adicionales</label>
+            <textarea id="dc-ficha-notas" rows="2" style="width:100%; background:var(--gris-medio); border:none; border-radius:8px; padding:12px; color:white"></textarea>
+          </div>
+          
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:20px">
+            <input type="checkbox" id="dc-ficha-por-ausencia" />
+            <span style="font-size:13px">⚠️ Este contacto es porque la persona faltó a la reunión</span>
+          </label>
+          
+          <button class="btn-primary" onclick="guardarFichaDC('${targetId}')">✅ Guardar contacto</button>
+        </div>
+      </div>
+    `;
+    }
+
+    window.seleccionarMiembroFichaDC = function (id, nombre) {
+      state.liderDCSeleccionado = { id, nombre };
+      cambiarPantalla('lider-dc-fichas');
+    };
+
+    window.guardarFichaDC = async function (congreganteId) {
+      const tipo = document.getElementById('dc-ficha-tipo')?.value;
+      const versiculo = document.getElementById('dc-ficha-versiculo')?.value;
+      const vidaEspiritual = document.getElementById('dc-ficha-espiritual')?.value;
+      const areasMejora = document.getElementById('dc-ficha-mejora')?.value;
+      const notas = document.getElementById('dc-ficha-notas')?.value;
+      const esPorAusencia = document.getElementById('dc-ficha-por-ausencia')?.checked || false;
+
+      const { error } = await sb.from('fichas_dc').insert({
+        congregante_id: congreganteId,
+        lider_id: state.usuario.id,
+        tipo_contacto: tipo,
+        versiculo_compartido: versiculo || null,
+        vida_espiritual: vidaEspiritual || null,
+        areas_mejora: areasMejora || null,
+        notas_adicionales: notas || null,
+        es_por_ausencia: esPorAusencia
+      });
+
+      if (error) {
+        mostrarToast('Error al guardar', 'error');
+        return;
+      }
+
+      mostrarToast('✅ Contacto registrado correctamente');
+
+      state.liderDCSeleccionado = null;
+      await cargarDatosLiderDC();
+      cambiarPantalla('home');
+    };
+
+    window.abrirFichaDC = function (id, nombre) {
+      state.liderDCSeleccionado = { id, nombre };
+      cambiarPantalla('lider-dc-fichas');
+    };
+
+    window.verHistorialFichasDC = async function (congreganteId) {
+      const { data: historial } = await sb.from('fichas_dc')
+        .select('*')
+        .eq('congregante_id', congreganteId)
+        .order('created_at', { ascending: false });
+
+      const miembro = state.miembrosGrupo?.find(m => m.id === congreganteId);
+      const nombre = miembro?.nombre || 'Desconocido';
+
+      if (!historial || historial.length === 0) {
+        mostrarToast(`📭 ${nombre} - No hay contactos registrados aún`);
+        return;
+      }
+
+      const resumen = historial.slice(0, 5).map(f =>
+        `📅 ${new Date(f.created_at).toLocaleDateString()}: ${f.tipo_contacto}`
+      ).join('\n');
+
+      alert(`📜 Historial de ${nombre}:\n\n${resumen}\n\n${historial.length > 5 ? `... y ${historial.length - 5} más` : ''}`);
+    };
+
+    // ============================================
+    // SECCIÓN HORY DASHBOARD & LOGIC
+    // ============================================
+
+    function renderHomeHory() {
+      const u = state.usuario;
+      const hora = new Date().getHours();
+      const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
+      const hoy = new Date();
+      const diaSemana = hoy.getDay();
+      const esServicio = diaSemana === 3 || diaSemana === 0;
+      const tipoServicio = diaSemana === 3 ? 'Miércoles' : diaSemana === 0 ? 'Domingo' : '';
+
+      return `
+      <div class="main-content">
+        <div class="welcome-banner">
+          <h2>${saludo}, ${u.nombre.split(' ')[0]} 👋</h2>
+          <p>Panel del <strong>Hory</strong> — Asistencias</p>
+        </div>
+
+        ${esServicio ? `
+          <div style="background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.3);border-radius:12px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+            <span style="font-size:24px">🟢</span>
+            <div>
+              <div style="font-size:14px;font-weight:600;color:#2ecc71">¡Hoy hay servicio!</div>
+              <div style="font-size:12px;color:var(--texto-suave)">Servicio del ${tipoServicio}</div>
+            </div>
+          </div>` : `
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+            <span style="font-size:24px">📅</span>
+            <div>
+              <div style="font-size:14px;font-weight:500">Próximos servicios</div>
+              <div style="font-size:12px;color:var(--texto-suave)">Miércoles 19:30 · Domingo 09:00</div>
+            </div>
+          </div>`}
+
+        <div class="menu-grid">
+          <div class="menu-card menu-card-full" onclick="cambiarPantalla('asistencia')">
+            <div class="icon">✅</div>
+            <div class="card-title">Tomar asistencia</div>
+            <div class="card-desc">Marcá presentes y ausentes del servicio de hoy</div>
+          </div>
+          <div class="menu-card menu-card-full" onclick="cambiarPantalla('nuevo-ingreso')">
+            <div class="icon">➕</div>
+            <div class="card-title">Nuevo ingreso</div>
+            <div class="card-desc">Registrá a alguien que viene por primera vez</div>
+          </div>
+        </div>
+
+        <div id="stats-hory">
+          <div style="text-align:center;color:var(--texto-suave);font-size:13px;padding:20px"></div>
+        </div>
+      </div>`;
+    }
+
+    function renderAsistencia() {
+      const filtrados = state.congregantes.filter(c =>
+        c.nombre.toLowerCase().includes(state.busqueda.toLowerCase())
+      );
+      const presentes = Object.values(state.asistenciasHoy).filter(Boolean).length;
+      const esHory = state.usuario?.rol === 'hory';
+
+      return `
+      <div class="section-header">
+        <h3>Asistencia</h3>
+        <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+      </div>
+
+      <div class="servicio-selector">
+        <div class="servicio-btn ${state.servicioActivo === 'miercoles' ? 'active' : ''}" onclick="cambiarServicio('miercoles')">
+          <div class="dia">📖</div>
+          <div>Miércoles</div>
+          <div class="hora">19:30</div>
+        </div>
+        <div class="servicio-btn ${state.servicioActivo === 'domingo' ? 'active' : ''}" onclick="cambiarServicio('domingo')">
+          <div class="dia">⛪</div>
+          <div>Domingo</div>
+          <div class="hora">09:00</div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-numero">${state.congregantes.length}</div>
+          <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-numero" style="color:var(--verde)">${presentes}</div>
+          <div class="stat-label">Presentes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-numero" style="color:var(--rojo-claro)">${state.congregantes.length - presentes}</div>
+          <div class="stat-label">Ausentes</div>
+        </div>
+      </div>
+
+      <input class="search-input" type="text" placeholder="🔍 Buscar congregante..." 
+        value="${state.busqueda}" oninput="debouncedFiltrarBusqueda(this.value)" />
+
+      <div id="lista-congregantes">
+        ${filtrados.length === 0 ?
+          `<div style="text-align:center;color:var(--texto-suave);padding:32px;font-size:14px">
+            ${state.congregantes.length === 0 ? 'No hay congregantes registrados aún.' : 'No se encontraron resultados.'}
+          </div>` :
+          filtrados.map(c => {
+            const presente = state.asistenciasHoy[c.id] || false;
+            const iniciales = c.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            return `
+              <div class="congregante-item ${presente ? 'presente' : ''}" id="item-${c.id}">
+                <div class="congregante-left">
+                  <div class="congregante-foto">
+                    ${c.foto_url ? `<img src="${c.foto_url}" alt="${c.nombre}" />` : iniciales}
+                  </div>
+                  <div>
+                    <div class="congregante-nombre">${c.nombre}</div>
+                    ${esHory ? '' : `<div class="congregante-estado estado-${c.estado}">${estadoLabel(c.estado)}</div>`}
+                  </div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" ${presente ? 'checked' : ''} onchange="toggleAsistencia('${c.id}', this.checked)" />
+                  <span class="slider"></span>
+                </label>
+              </div>`;
+          }).join('')
+        }
+      </div>`;
+    }
+
+    function renderNuevoIngreso() {
+      return `
+      <div class="section-header">
+        <h3>Nuevo ingreso</h3>
+        <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+      </div>
+
+      <div class="nuevo-form">
+        <div style="text-align:center;margin-bottom:20px">
+          <div class="foto-upload" id="foto-upload-btn" onclick="document.getElementById('foto-input').click()">
+            <div id="foto-preview">📷</div>
+            <span>Foto (opcional)</span>
+          </div>
+          <input type="file" id="foto-input" accept="image/*" style="display:none" onchange="previsualizarFoto(this)" />
+        </div>
+
+        <div class="input-group">
+          <label>Nombre completo *</label>
+          <input type="text" id="nuevo-nombre" placeholder="Nombre y apellido" />
+        </div>
+        <div class="input-group">
+          <label>Teléfono (opcional)</label>
+          <input type="tel" id="nuevo-telefono" placeholder="0981 000 000" />
+        </div>
+        <div class="input-group">
+          <label>Servicio en el que ingresó</label>
+          <select id="nuevo-servicio">
+            <option value="domingo">Domingo 09:00</option>
+            <option value="miercoles">Miércoles 19:30</option>
+          </select>
+        </div>
+
+        <button class="btn-primary" id="btn-guardar-nuevo">Registrar nuevo ingreso</button>
+        <div id="nuevo-error" style="display:none" class="error-msg"></div>
+        <div id="nuevo-exito" style="display:none" class="success-msg"></div>
+      </div>`;
+    }
+
+    // Function to handle changing service in attendance screen
+    window.cambiarServicio = async function (servicio) {
+      if (serviceChangeInFlight) return;
+      serviceChangeInFlight = true;
+
+      try {
+        // Guardar antes de cambiar, para no perder el trabajo si el Hory navega entre servicios
+        await withTimeout(guardarAsistencias(), 20000, 'guardar asistencias');
+
+        state.servicioActivo = servicio;
+
+        // Si ya tenemos cache local del servicio, úsalo; si no, carga desde DB
+        const cache = state.asistenciasPorServicio?.[servicio];
+        if (cache && Object.keys(cache).length > 0) {
+          state.asistenciasHoy = { ...cache };
+        } else {
+          await withTimeout(cargarAsistenciasHoy(), 20000, 'cargar asistencias');
+        }
+
+        render();
+
+        // Update service buttons UI
+        document.querySelectorAll('.servicio-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.querySelector(`.servicio-btn[onclick="cambiarServicio('${servicio}')"]`);
+        if (activeBtn) activeBtn.classList.add('active');
+      } catch (e) {
+        console.error('Error al cambiar servicio:', e);
+        const detalle = String(e?.message || '');
+        if (detalle.startsWith('Timeout:')) {
+          mostrarToast('⚠️ La operación tardó demasiado. ' + detalle.replace('Timeout: ', ''), 'error');
+        } else {
+          mostrarToast('⚠️ Error al cambiar servicio. Probá de nuevo.', 'error');
+        }
+      } finally {
+        serviceChangeInFlight = false;
+      }
+    };
+
+    /**
+     * Filters the congregant list based on the search input value.
+     * This function is called by the debounced version to avoid excessive updates.
+     */
+    window.filtrarBusqueda = function (valor) {
+      state.busqueda = valor;
+      const lista = document.getElementById('lista-congregantes');
+      if (!lista) return;
+
+      const esHory = state.usuario?.rol === 'hory';
+
+      const filtrados = state.congregantes.filter(c =>
+        c.nombre.toLowerCase().includes(valor.toLowerCase())
+      );
+
+      lista.innerHTML = filtrados.length === 0 ?
+        `<div style="text-align:center;color:var(--texto-suave);padding:32px;font-size:14px">No se encontraron resultados.</div>` :
+        filtrados.map(c => {
+          const presente = state.asistenciasHoy[c.id] || false;
+          const iniciales = c.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          return `
+        <div class="congregante-item ${presente ? 'presente' : ''}" id="item-${c.id}">
+          <div class="congregante-left">
+            <div class="congregante-foto">${c.foto_url ? `<img src="${c.foto_url}" />` : sanitizar(iniciales)}</div>
+            <div>
+              <div class="congregante-nombre">${sanitizar(c.nombre)}</div>
+              ${esHory ? '' : `<div class="congregante-estado estado-${c.estado}">${estadoLabel(c.estado)}</div>`}
+            </div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" ${presente ? 'checked' : ''} onchange="toggleAsistencia('${c.id}', this.checked)" />
+            <span class="slider"></span>
+          </label>
+        </div>`;
+        }).join('');
+    };
+
+    // Performance Optimization: Debounce for search input to prevent excessive DOM manipulation
+    // NOTE: This definition MUST appear AFTER the definition of `filtrarBusqueda` to avoid ReferenceError.
+    window.debouncedFiltrarBusqueda = debounce(filtrarBusqueda, 300);
+
+    /**
+     * Updates local state and UI for attendance. Does NOT save to database immediately.
+     * @param {string} congreganteId - ID of the congregant.
+     * @param {boolean} presente - True if present, false otherwise.
+     */
+    window.toggleAsistencia = function (congreganteId, presente) {
+      state.asistenciasHoy[congreganteId] = presente;
+      if (!state.asistenciasPorServicio) state.asistenciasPorServicio = { domingo: {}, miercoles: {} };
+      if (!state.asistenciasPorServicio[state.servicioActivo]) state.asistenciasPorServicio[state.servicioActivo] = {};
+      state.asistenciasPorServicio[state.servicioActivo][congreganteId] = presente;
+
+      const item = document.getElementById('item-' + congreganteId);
+      if (item) {
+        if (presente) {
+          item.classList.add('presente');
+        } else {
+          item.classList.remove('presente');
+        }
+      }
+
+      const presentes = Object.values(state.asistenciasHoy).filter(Boolean).length;
+      const statsCards = document.querySelectorAll('.stats-row .stat-card');
+      if (statsCards.length >= 3) {
+        const presentesCard = statsCards[1]?.querySelector('.stat-numero');
+        const ausentesCard = statsCards[2]?.querySelector('.stat-numero');
+        if (presentesCard) presentesCard.textContent = presentes;
+        if (ausentesCard) ausentesCard.textContent = state.congregantes.length - presentes;
+      }
+    };
+
+    /**
+     * Saves all local attendance changes (from state.asistenciasHoy) to the database.
+     * This is called when exiting the attendance screen.
+     */
+    window.guardarAsistencias = async function () {
+      try {
+        const hoy = new Date().toISOString().split('T')[0];
+        const asistenciasAPendientes = [];
+
+        for (const [congreganteId, presente] of Object.entries(state.asistenciasHoy)) {
+          asistenciasAPendientes.push({
+            congregante_id: congreganteId,
+            tipo_servicio: state.servicioActivo,
+            fecha: hoy,
+            presente: presente,
+            registrado_por: state.usuario.id
+          });
+        }
+
+        if (asistenciasAPendientes.length === 0) return;
+
+        const { error } = await withTimeout(
+          sb.from('asistencias').upsert(asistenciasAPendientes, {
+            onConflict: 'congregante_id,tipo_servicio,fecha'
+          }),
+          12000,
+          'guardar asistencias'
+        );
+
+        if (error) {
+          console.error('Error al guardar asistencias:', error);
+          mostrarToast('⚠️ No se pudieron guardar las asistencias', 'error');
+          return;
+        }
+
+        if (!state.asistenciasPorServicio) state.asistenciasPorServicio = { domingo: {}, miercoles: {} };
+        state.asistenciasPorServicio[state.servicioActivo] = { ...state.asistenciasHoy };
+      } catch (e) {
+        console.error('Error inesperado al guardar asistencias:', e);
+        mostrarToast('⚠️ No se pudieron guardar las asistencias', 'error');
+      }
+    };
+
+    window.addEventListener('error', (event) => {
+      try {
+        console.error('Error global:', event?.error || event);
+      } catch (e) { /* noop */ }
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      try {
+        console.error('Promise rechazada sin manejar:', event?.reason || event);
+        mostrarToast('⚠️ Ocurrió un error interno. Probá refrescar si persiste.', 'error');
+      } catch (e) { /* noop */ }
+    });
+
+    window.previsualizarFoto = function (input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          state.fotoNuevo = e.target.result;
+          const preview = document.getElementById('foto-preview');
+          if (preview) preview.innerHTML = `<img src="${e.target.result}" style="width:80px;height:80px;object-fit:cover;border-radius:50%" />`;
+          const btn = document.getElementById('foto-upload-btn');
+          if (btn) btn.querySelector('span').textContent = 'Cambiar foto';
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    };
+
+    window.previsualizarFotoEdicion = function (input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          state.fotoEdicion = e.target.result;
+          const preview = document.getElementById('edit-foto-preview');
+          if (preview) preview.innerHTML = `<img src="${e.target.result}" alt="foto" style="width:100%;height:100%;object-fit:cover;border-radius:12px" />`;
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    };
+
+    window.guardarPerfilCongregante = async function (congreganteId) {
+      const nombre = document.getElementById('edit-nombre')?.value?.trim();
+      const telefono = document.getElementById('edit-telefono')?.value?.trim();
+
+      if (!nombre) {
+        mostrarToast('⚠️ El nombre es obligatorio', 'error');
+        return;
+      }
+
+      const update = {
+        nombre,
+        telefono: telefono || null
+      };
+
+      if (state.fotoEdicion) update.foto_url = state.fotoEdicion;
+
+      try {
+        const { error } = await withTimeout(
+          sb.from('congregantes').update(update).eq('id', congreganteId),
+          12000,
+          'guardar perfil congregante'
+        );
+        if (error) throw error;
+
+        actualizarCongreganteEnColecciones(congreganteId, update);
+        state.fotoEdicion = null;
+        mostrarToast('✅ Datos actualizados');
+        render();
+      } catch (e) {
+        console.error('Error al guardar perfil congregante:', e);
+        mostrarToast('⚠️ No se pudo guardar: ' + (e?.message || 'sin detalle'), 'error');
+        await cargarCongregantes();
+        if (state.usuario?.rol === 'nangareko') await cargarDatosNangareko();
+        render();
+      }
+    };
+
+    async function cargarCongregantes() {
+      const { data, error } = await sb.from('congregantes').select('*').order('nombre');
+      if (error) {
+        console.error('Error al cargar congregantes:', error);
+        mostrarToast('⚠️ No se pudieron cargar los congregantes (ver permisos/RLS)', 'error');
+        state.congregantes = [];
+        return;
+      }
+      state.congregantes = data || [];
+    }
+
+    async function cargarAsistenciasHoy() {
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data, error } = await sb.from('asistencias')
+        .select('congregante_id, presente')
+        .eq('tipo_servicio', state.servicioActivo)
+        .eq('fecha', hoy);
+      if (error) {
+        console.error('Error al cargar asistencias:', error);
+        mostrarToast('⚠️ No se pudieron cargar asistencias (ver permisos/RLS)', 'error');
+      }
+      state.asistenciasHoy = {};
+      (data || []).forEach(a => { state.asistenciasHoy[a.congregante_id] = a.presente; });
+      if (!state.asistenciasPorServicio) state.asistenciasPorServicio = { domingo: {}, miercoles: {} };
+      state.asistenciasPorServicio[state.servicioActivo] = { ...state.asistenciasHoy };
+    }
+
+    async function cargarStatsHory() {
+      const el = document.getElementById('stats-hory');
+      if (!el) return;
+      await cargarCongregantes();
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data: asist } = await sb.from('asistencias').select('presente').eq('fecha', hoy);
+      const presentes = (asist || []).filter(a => a.presente).length;
+      const nuevos = state.congregantes.filter(c => c.estado === 'nuevo').length;
+      el.innerHTML = `
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-numero">${state.congregantes.length}</div><div class="stat-label">Congregantes</div></div>
+        <div class="stat-card"><div class="stat-numero" style="color:var(--verde)">${presentes}</div><div class="stat-label">Hoy presentes</div></div>
+        <div class="stat-card"><div class="stat-numero" style="color:var(--dorado)">${nuevos}</div><div class="stat-label">Nuevos</div></div>
+      </div>`;
+    }
+
+    // Initialize application when DOM is ready
+    document.addEventListener('DOMContentLoaded', init);
+
+    // Initial app load function
+    async function init() {
+      const { data: { session } } = await sb.auth.getSession();
+      state.session = session;
+
+      if (session) {
+        await cargarUsuario();
+        setupRealtimeListeners();
+
+        if (state.usuario?.rol === 'pastor') await cargarDatosPastor();
+        if (state.usuario?.rol === 'nangareko') await cargarDatosNangareko();
+        if (state.usuario?.rol === 'lider_dc') await cargarDatosLiderDC();
+        if (state.usuario?.rol === 'hory') await cargarStatsHory();
+      }
+
+      state.loading = false;
+      render();
+
+      sb.auth.onAuthStateChange(async (event, session) => {
+        state.session = session;
+        if (session) {
+          await cargarUsuario();
+          setupRealtimeListeners();
+
+          if (state.usuario?.rol === 'pastor') await cargarDatosPastor();
+          if (state.usuario?.rol === 'nangareko') await cargarDatosNangareko();
+          if (state.usuario?.rol === 'lider_dc') await cargarDatosLiderDC();
+          if (state.usuario?.rol === 'hory') await cargarStatsHory();
+        } else {
+          state.usuario = null;
+          cleanupRealtimeListeners();
+        }
+        render();
+      });
+
+ 	  const ONESIGNAL_BASE_PATH = '/';
+
+	  if ('serviceWorker' in navigator) {
+		window.__onesignalSwRegistrationPromise = (async () => {
+			try {
+				// Si esta página está controlada por un SW viejo, puede interceptar la descarga del SW de OneSignal
+				// y devolver un 404 "fantasma". En ese caso, desregistramos todo y recargamos UNA sola vez.
+				if (navigator.serviceWorker.controller && !sessionStorage.getItem('sw_reset_done')) {
+					sessionStorage.setItem('sw_reset_done', '1');
+					const regs0 = await navigator.serviceWorker.getRegistrations();
+					for (const reg of regs0) {
+						try { await reg.unregister(); } catch (e) { /* noop */ }
+					}
+					setTimeout(() => location.reload(), 50);
+					return null;
+				}
+
+				const regs = await navigator.serviceWorker.getRegistrations();
+				for (const reg of regs) {
+					try { await reg.unregister(); } catch (e) { /* noop */ }
+				}
+
+				window.__onesignalSwRegistration = await navigator.serviceWorker.register(
+					`${ONESIGNAL_BASE_PATH}OneSignalSDKWorker.js`,
+					{ scope: ONESIGNAL_BASE_PATH }
+				);
+				return window.__onesignalSwRegistration;
+			} catch (e) {
+				console.error('No se pudo registrar el service worker:', e);
+				return null;
+			}
+		})();
+	  }
+
+	  const ONESIGNAL_APP_ID = '118093bb-70fa-4c85-be91-e4d75404c283';
+	  if (ONESIGNAL_APP_ID) {
+		window.OneSignalDeferred = window.OneSignalDeferred || [];
+		OneSignalDeferred.push(async function (OneSignal) {
+			const scopeBase = ONESIGNAL_BASE_PATH;
+			let swReg = null;
+			try {
+				swReg = await (window.__onesignalSwRegistrationPromise || Promise.resolve(window.__onesignalSwRegistration || null));
+				if (!swReg && 'serviceWorker' in navigator) {
+					swReg = await navigator.serviceWorker.getRegistration(scopeBase);
+				}
+			} catch (e) {
+				console.error('No se pudo obtener serviceWorkerRegistration:', e);
+			}
+
+			await OneSignal.init({
+				appId: ONESIGNAL_APP_ID,
+				serviceWorkerRegistration: swReg || undefined,
+				serviceWorkerPath: `${ONESIGNAL_BASE_PATH}OneSignalSDKWorker.js`,
+				serviceWorkerUpdaterPath: `${ONESIGNAL_BASE_PATH}OneSignalSDKUpdaterWorker.js`,
+				serviceWorkerParam: { scope: scopeBase },
+				notifyButton: {
+					enable: true
+				}
+			});
+
+			try {
+				await OneSignal.User?.PushSubscription?.optIn?.();
+			} catch (e) {
+				console.error('Error al hacer opt-in en OneSignal:', e);
+			}
+
+			try {
+				const osId = await OneSignal.User?.onesignalId;
+				const pushId = await OneSignal.User?.PushSubscription?.id;
+				console.log('OneSignal:', { osId, pushId, scopeBase });
+			} catch (e) {
+				console.error('Diagnóstico OneSignal error:', e);
+			}
+
+			try {
+				const perm = await OneSignal.Notifications.permission;
+				if (perm !== 'granted') {
+					await OneSignal.Notifications.requestPermission();
+				}
+			} catch (e) {
+				console.error('Error al solicitar permiso de notificaciones:', e);
+			}
+		});
+	  }
+    }
+  </script>
+</body>
+
+</html>
