@@ -2623,14 +2623,17 @@ async function cargarDatosPastor() {
               .in('congregante_id', ids)
               .in('tipo_servicio', ['miercoles', 'domingo'])
               .eq('presente', true);
-            if (!error && (count || 0) === 0) {
+            if (error) {
+              console.error('No se pudo verificar asistencias para avisos (Ñangareko):', error);
+              mostrarToast('⚠️ No se pudieron leer asistencias para calcular avisos (permisos/RLS).', 'error');
+            } else if ((count || 0) === 0) {
               mostrarToast('ℹ️ No hay asistencias registradas (domingo/miércoles) para tus cuidados. Sin asistencia inicial no se generan avisos.', 'error');
             }
           }
         }
       } catch (e) {
         console.error('Error al calcular avisos (Ñangareko):', e);
-        mostrarToast('⚠️ No se pudieron calcular los avisos. Revisá tu conexión o permisos.', 'error');
+        mostrarToast('⚠️ No se pudieron calcular los avisos: ' + (e?.message || 'revisá conexión/permisos'), 'error');
         state.nangarekoAvisos = [];
       }
 
