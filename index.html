@@ -945,6 +945,10 @@
         .order('fecha', { ascending: true });
       if (asistError) throw asistError;
 
+      if (!Array.isArray(asistData) || asistData.length === 0) {
+        return [];
+      }
+
       const { data: fichasData, error: fichasError } = await sb
         .from('fichas_nangareko')
         .select('congregante_id, created_at, notas_adicionales')
@@ -1153,6 +1157,34 @@
         }, ms);
       });
       return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+    }
+
+    async function asegurarSesionVigente() {
+      try {
+        const { data: { session } } = await withTimeout(sb.auth.getSession(), 12000, 'verificar sesión');
+        state.session = session;
+        if (!session) {
+          state.usuario = null;
+          cleanupRealtimeListeners();
+          render();
+          mostrarToast('⚠️ Tu sesión expiró. Volvé a iniciar sesión.', 'error');
+          return false;
+        }
+
+        const exp = Number(session.expires_at || 0) * 1000;
+        const faltaMs = exp - Date.now();
+        if (exp && faltaMs < 60_000) {
+          const { data, error } = await withTimeout(sb.auth.refreshSession(), 12000, 'refrescar sesión');
+          if (!error && data?.session) {
+            state.session = data.session;
+          }
+        }
+        return true;
+      } catch (e) {
+        console.error('Error verificando/refrescando sesión:', e);
+        mostrarToast('⚠️ Problema de conexión/sesión. Probá recargar.', 'error');
+        return false;
+      }
     }
 
     function estadoLabel(estado) {
@@ -2627,7 +2659,7 @@ async function cargarDatosPastor() {
               console.error('No se pudo verificar asistencias para avisos (Ñangareko):', error);
               mostrarToast('⚠️ No se pudieron leer asistencias para calcular avisos (permisos/RLS).', 'error');
             } else if ((count || 0) === 0) {
-              mostrarToast('ℹ️ No hay asistencias registradas (domingo/miércoles) para tus cuidados. Sin asistencia inicial no se generan avisos.', 'error');
+              mostrarToast('ℹ️ No se ven asistencias (domingo/miércoles) para tus cuidados. Si en Supabase sí existen, es casi seguro un bloqueo por RLS (políticas).', 'error');
             }
           }
         }
@@ -2911,7 +2943,7 @@ async function cargarDatosPastor() {
             <span style="font-size:13px">⚠️ Este contacto es porque la persona faltó a algún servicio</span>
           </label>
           
-          <button class="btn-primary" onclick="guardarFichaContacto('${targetId}')">✅ Guardar contacto</button>
+          <button class="btn-primary" id="btn-guardar-ficha" onclick="guardarFichaContacto('${targetId}')">✅ Guardar contacto</button>
         </div>
       </div>
     `;
@@ -2923,34 +2955,56 @@ async function cargarDatosPastor() {
     };
 
     window.guardarFichaContacto = async function (congreganteId) {
-      const tipo = document.getElementById('ficha-tipo')?.value;
-      const versiculo = document.getElementById('ficha-versiculo')?.value;
-      const estadoAnimo = document.getElementById('ficha-animo')?.value;
-      const motivoOracion = document.getElementById('ficha-oracion')?.value;
-      const notas = document.getElementById('ficha-notas')?.value;
-      const esPorAusencia = document.getElementById('ficha-por-ausencia')?.checked || false;
+      const btn = document.getElementById('btn-guardar-ficha');
+      const btnTxt = btn?.textContent;
+      try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
-      const { error } = await sb.from('fichas_nangareko').insert({
-        congregante_id: congreganteId,
-        nangareko_id: state.usuario.id,
-        tipo_contacto: tipo,
-        versiculo_compartido: versiculo || null,
-        estado_animo: estadoAnimo,
-        motivo_oracion: motivoOracion || null,
-        notas_adicionales: notas || null,
-        es_por_ausencia: esPorAusencia
-      });
+        const okSesion = await asegurarSesionVigente();
+        if (!okSesion) return;
 
-      if (error) {
-        mostrarToast('Error al guardar', 'error');
-        return;
+        const tipo = document.getElementById('ficha-tipo')?.value;
+        const versiculo = document.getElementById('ficha-versiculo')?.value;
+        const estadoAnimo = document.getElementById('ficha-animo')?.value;
+        const motivoOracion = document.getElementById('ficha-oracion')?.value;
+        const notas = document.getElementById('ficha-notas')?.value;
+        const esPorAusencia = document.getElementById('ficha-por-ausencia')?.checked || false;
+
+        const { error } = await withTimeout(
+          sb.from('fichas_nangareko').insert({
+            congregante_id: congreganteId,
+            nangareko_id: state.usuario.id,
+            tipo_contacto: tipo,
+            versiculo_compartido: versiculo || null,
+            estado_animo: estadoAnimo,
+            motivo_oracion: motivoOracion || null,
+            notas_adicionales: notas || null,
+            es_por_ausencia: esPorAusencia
+          }),
+          20000,
+          'guardar ficha contacto ñangareko'
+        );
+
+        if (error) throw error;
+
+        mostrarToast('✅ Contacto registrado correctamente');
+
+        state.congreganteSeleccionado = null;
+        await withTimeout(cargarDatosNangareko(), 20000, 'recargar datos ñangareko');
+        cambiarPantalla('home');
+      } catch (e) {
+        console.error('Error al guardar ficha contacto (Ñangareko):', e);
+        const msg = String(e?.message || 'sin detalle');
+        if (msg.toLowerCase().includes('jwt') || msg.toLowerCase().includes('token') || msg.toLowerCase().includes('session')) {
+          mostrarToast('⚠️ Tu sesión parece vencida. Probá recargar e iniciar sesión.', 'error');
+        } else if (msg.startsWith('Timeout:')) {
+          mostrarToast('⚠️ Guardar tardó demasiado. Revisá tu conexión e intentá de nuevo.', 'error');
+        } else {
+          mostrarToast('⚠️ No se pudo guardar: ' + msg, 'error');
+        }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = btnTxt || '✅ Guardar contacto'; }
       }
-
-      mostrarToast('✅ Contacto registrado correctamente');
-
-      state.congreganteSeleccionado = null;
-      await cargarDatosNangareko();
-      cambiarPantalla('home');
     };
 
     window.abrirFichaContacto = function (id, nombre) {
@@ -3857,6 +3911,18 @@ async function cargarDatosPastor() {
     async function init() {
       const { data: { session } } = await sb.auth.getSession();
       state.session = session;
+
+      document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && state.session) {
+          await asegurarSesionVigente();
+        }
+      });
+
+      window.addEventListener('focus', async () => {
+        if (state.session) {
+          await asegurarSesionVigente();
+        }
+      });
 
       if (session) {
         await cargarUsuario();
