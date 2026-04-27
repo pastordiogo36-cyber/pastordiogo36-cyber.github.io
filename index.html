@@ -927,7 +927,8 @@
       miembrosGrupo: [],
       asistenciaDCHoy: {},
       liderDCContactos: [],
-      liderDCFichas: []
+      liderDCFichas: [],
+      liderDCAvisos: []
     };
 
     async function calcularAvisosNangareko(cuidados) {
@@ -1067,6 +1068,148 @@
             nombre,
             mensaje: `Alimenta a ${nombre}${extra}`
           });
+        }
+      }
+
+      return avisos;
+    }
+
+    async function calcularAvisosLiderDC(miembros) {
+      const hoy = new Date();
+      const hoyYmd = hoy.toISOString().split('T')[0];
+      const ids = (miembros || []).map(m => m.id).filter(Boolean);
+      if (ids.length === 0) return [];
+
+      const parseYmd = (ymd) => {
+        const [y, m, dd] = String(ymd).split('-').map(Number);
+        return new Date(y, (m || 1) - 1, dd || 1);
+      };
+
+      const addDias = (d, n) => {
+        const x = new Date(d);
+        x.setDate(x.getDate() + n);
+        return x;
+      };
+
+      const addMes = (d, n) => {
+        const x = new Date(d);
+        const day = x.getDate();
+        x.setMonth(x.getMonth() + n);
+        if (x.getDate() !== day) x.setDate(0);
+        return x;
+      };
+
+      const inicio30 = new Date(hoy);
+      inicio30.setDate(inicio30.getDate() - 30);
+      const inicio30Ymd = inicio30.toISOString().split('T')[0];
+
+      const dcOficialDesdePorId = new Map();
+      for (const m of (miembros || [])) {
+        if (!m?.id) continue;
+        const ymd = String(m?.dc_oficial_desde || '').slice(0, 10);
+        if (ymd && /^\d{4}-\d{2}-\d{2}$/.test(ymd)) dcOficialDesdePorId.set(m.id, ymd);
+      }
+
+      const [asistDcRes, ausenciasRes, fichasRes] = await Promise.all([
+        sb.from('asistencias')
+          .select('congregante_id, fecha')
+          .in('congregante_id', ids)
+          .eq('tipo_servicio', 'dc')
+          .eq('presente', true)
+          .order('fecha', { ascending: true }),
+        sb.from('asistencias')
+          .select('congregante_id, fecha')
+          .in('congregante_id', ids)
+          .in('tipo_servicio', ['domingo', 'miercoles', 'dc'])
+          .eq('presente', false)
+          .gte('fecha', inicio30Ymd)
+          .order('fecha', { ascending: true }),
+        sb.from('fichas_dc')
+          .select('congregante_id, created_at, es_por_ausencia')
+          .eq('lider_id', state.usuario.id)
+          .in('congregante_id', ids)
+          .order('created_at', { ascending: false })
+      ]);
+
+      if (asistDcRes.error) throw asistDcRes.error;
+      if (ausenciasRes.error) throw ausenciasRes.error;
+      if (fichasRes.error) throw fichasRes.error;
+
+      const primeraDcPorId = new Map();
+      for (const r of (asistDcRes.data || [])) {
+        if (!r?.congregante_id || !r?.fecha) continue;
+        const oficialDesdeYmd = dcOficialDesdePorId.get(r.congregante_id) || null;
+        if (oficialDesdeYmd && String(r.fecha) < oficialDesdeYmd) continue;
+        if (!primeraDcPorId.has(r.congregante_id)) primeraDcPorId.set(r.congregante_id, r.fecha);
+      }
+
+      const ausenciasPorId = new Map();
+      for (const r of (ausenciasRes.data || [])) {
+        if (!r?.congregante_id || !r?.fecha) continue;
+        if (!ausenciasPorId.has(r.congregante_id)) ausenciasPorId.set(r.congregante_id, []);
+        ausenciasPorId.get(r.congregante_id).push(r.fecha);
+      }
+
+      const ultimaFichaPorId = new Map();
+      const ultimaFichaAusenciaPorId = new Map();
+      for (const f of (fichasRes.data || [])) {
+        if (!f?.congregante_id || !f?.created_at) continue;
+        if (!ultimaFichaPorId.has(f.congregante_id)) {
+          ultimaFichaPorId.set(f.congregante_id, String(f.created_at).slice(0, 10));
+        }
+        if (f.es_por_ausencia && !ultimaFichaAusenciaPorId.has(f.congregante_id)) {
+          ultimaFichaAusenciaPorId.set(f.congregante_id, String(f.created_at).slice(0, 10));
+        }
+      }
+
+      const avisos = [];
+      for (const m of (miembros || [])) {
+        const id = m?.id;
+        if (!id) continue;
+
+        // Alimenta mensual (desde el día siguiente del primer DC)
+        const primeraDcYmd = primeraDcPorId.get(id);
+        if (primeraDcYmd) {
+          const base = parseYmd(primeraDcYmd);
+          const primerAviso = addDias(base, 1);
+          if (primerAviso <= hoy) {
+            let due = new Date(primerAviso);
+            while (addMes(due, 1) <= hoy) due = addMes(due, 1);
+            const dueYmd = due.toISOString().split('T')[0];
+            const ultimaFichaYmd = ultimaFichaPorId.get(id) || null;
+            if (!(dueYmd && ultimaFichaYmd && ultimaFichaYmd >= dueYmd)) {
+              const atraso = dueYmd === hoyYmd ? '' : ` (atrasado desde ${due.toLocaleDateString()})`;
+              avisos.push({
+                tipo: 'alimentar',
+                congregante_id: id,
+                nombre: m?.nombre || 'Sin nombre',
+                mensaje: `Alimenta a ${(m?.nombre || 'Sin nombre')}${atraso}`
+              });
+            }
+          }
+        }
+
+        // Ausencias acumulativas (3 ausencias en últimos 30 días)
+        const fechas = (ausenciasPorId.get(id) || []).filter(Boolean);
+        if (fechas.length >= 3) {
+          const uniq = Array.from(new Set(fechas)).sort();
+          if (uniq.length >= 3) {
+            const terceraYmd = uniq[2];
+            const tercera = parseYmd(terceraYmd);
+            const trigger = addDias(tercera, 1);
+            const triggerYmd = trigger.toISOString().split('T')[0];
+            if (trigger <= hoy) {
+              const ultimaAusYmd = ultimaFichaAusenciaPorId.get(id) || null;
+              if (!(triggerYmd && ultimaAusYmd && ultimaAusYmd >= triggerYmd)) {
+                avisos.push({
+                  tipo: 'ausencias',
+                  congregante_id: id,
+                  nombre: m?.nombre || 'Sin nombre',
+                  mensaje: `Ausencias de ${(m?.nombre || 'Sin nombre')} (3 en 30 días)`
+                });
+              }
+            }
+          }
         }
       }
 
@@ -1569,6 +1712,7 @@
       if (state.pantalla === 'lider-dc-grupo') return renderLiderDCGrupo();
       if (state.pantalla === 'lider-dc-asistencia') return renderLiderDCAsistencia();
       if (state.pantalla === 'lider-dc-fichas') return renderLiderDCFichas();
+      if (state.pantalla === 'lider-dc-avisos') return renderLiderDCAvisos();
       return `<div class="coming-soon"><div class="big-icon">🚧</div><h3>Próximamente</h3><p>Esta sección estará disponible en la siguiente etapa.</p><div class="tag-etapa">En construcción</div></div>`;
     }
 
@@ -2380,14 +2524,30 @@ async function cargarDatosPastor() {
 
     window.actualizarEstadoCongregante = async function (congreganteId, nuevoEstado) {
       try {
-        const { error } = await withTimeout(
-          sb.from('congregantes').update({ estado: nuevoEstado }).eq('id', congreganteId),
-          12000,
-          'actualizar estado'
-        );
+        const patch = { estado: nuevoEstado };
+        if (nuevoEstado === 'graduado') {
+          patch.nangareko_id = null;
+        }
+
+        let res;
+        if (nuevoEstado === 'graduado') {
+          const hoyYmd = new Date().toISOString().split('T')[0];
+          res = await withTimeout(
+            sb.rpc('marcar_congregante_graduado', { p_congregante_id: congreganteId, p_hoy: hoyYmd }),
+            12000,
+            'actualizar estado'
+          );
+        } else {
+          res = await withTimeout(
+            sb.from('congregantes').update(patch).eq('id', congreganteId),
+            12000,
+            'actualizar estado'
+          );
+        }
+        const { error } = res || {};
         if (error) throw error;
 
-        actualizarCongreganteEnColecciones(congreganteId, { estado: nuevoEstado });
+        actualizarCongreganteEnColecciones(congreganteId, patch);
         mostrarToast('✅ Estado actualizado');
         render();
       } catch (e) {
@@ -3045,6 +3205,7 @@ async function cargarDatosPastor() {
       const totalMiembros = state.miembrosGrupo?.length || 0;
       const tieneGrupo = state.miGrupo !== null;
       const proximaReunion = state.miGrupo ? `${state.miGrupo.dia_reunion || 'Sin día'} ${state.miGrupo.hora_reunion || ''}` : 'Sin asignar';
+      const avisosHoy = state.liderDCAvisos?.length || 0;
 
       return `
       <div class="main-content">
@@ -3073,6 +3234,11 @@ async function cargarDatosPastor() {
             <div class="icon">🏠</div>
             <div class="card-title">Mi grupo DC</div>
             <div class="card-desc">${totalMiembros} miembros a tu cargo</div>
+          </div>
+          <div class="menu-card menu-card-full" onclick="cambiarPantalla('lider-dc-avisos')">
+            <div class="icon">🔔</div>
+            <div class="card-title">Avisos</div>
+            <div class="card-desc">${avisosHoy > 0 ? `${avisosHoy} aviso(s) para hoy` : 'No hay avisos para hoy'}</div>
           </div>
           <div class="menu-card menu-card-full" onclick="cambiarPantalla('lider-dc-asistencia')">
             <div class="icon">✅</div>
@@ -3117,6 +3283,19 @@ async function cargarDatosPastor() {
         state.miembrosGrupo = [];
       }
 
+      try {
+        const candidatosAvisos = (state.miembrosGrupo || []).filter(m => {
+          const estadoOk = ['en_dc', 'graduado'].includes(String(m?.estado || ''));
+          const desligado = !m?.nangareko_id;
+          return estadoOk && desligado;
+        });
+        state.liderDCAvisos = await calcularAvisosLiderDC(candidatosAvisos);
+      } catch (e) {
+        console.error('Error al calcular avisos (Líder DC):', e);
+        mostrarToast('⚠️ No se pudieron calcular los avisos del DC: ' + (e?.message || 'revisá conexión/permisos'), 'error');
+        state.liderDCAvisos = [];
+      }
+
       const { data: ultimosContactos } = await sb.from('fichas_dc')
         .select('*, congregantes(nombre)')
         .eq('lider_id', userId)
@@ -3136,6 +3315,39 @@ async function cargarDatosPastor() {
           container.innerHTML = '<div class="info-row"><span class="label">No hay contactos registrados aún</span></div>';
         }
       }
+    }
+
+    function renderLiderDCAvisos() {
+      const avisos = state.liderDCAvisos || [];
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>🔔 Avisos del DC</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
+
+        ${avisos.length === 0 ?
+          `<div class="coming-soon">
+            <div class="big-icon">✅</div>
+            <h3>No hay avisos para hoy</h3>
+            <p>Cuando haya tareas pendientes aparecerán aquí</p>
+          </div>` :
+          avisos.map(a => `
+            <div class="info-section" style="margin-bottom:12px">
+              <div class="info-row">
+                <span class="label">${a.tipo === 'alimentar' ? '🍞 Alimenta' : '⚠️ Ausencias'}</span>
+                <span style="font-weight:500">${sanitizar(a.nombre)}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Aviso</span>
+                <span style="font-size:12px">${sanitizar(a.mensaje)}</span>
+              </div>
+              <button class="btn-primary" style="margin-top:10px" onclick="abrirFichaDC('${a.congregante_id}', '${sanitizar(a.nombre)}')">➡️ Ir a tarea</button>
+            </div>
+          `).join('')
+        }
+      </div>
+    `;
     }
 
     function renderLiderDCGrupo() {
