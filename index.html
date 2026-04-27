@@ -983,13 +983,12 @@
 
       for (const c of (cuidados || [])) {
         const nombre = c?.nombre || 'Sin nombre';
-        const ingresoYmd = (c?.created_at ? String(c.created_at).slice(0, 10) : hoyYmd);
-        const ingreso = parseYmd(ingresoYmd);
-
         const primera = primeraAsistenciaPorId.get(c.id);
-        const baseYmd = primera?.fecha || ingresoYmd;
+        if (!primera?.fecha) continue;
+
+        const baseYmd = primera.fecha;
         const base = parseYmd(baseYmd);
-        const diasDesdeIngreso = diasEntre(ingreso, hoy);
+        const diasDesdeIngreso = diasEntre(base, hoy);
 
         let debeHoy = false;
         let atrasadoDesde = null;
