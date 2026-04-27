@@ -1453,15 +1453,18 @@
 
             try {
               const hoy = new Date().toISOString().split('T')[0];
-              await sb.from('asistencias').upsert({
+              const { error: errAutoAsis } = await sb.from('asistencias').upsert({
                 congregante_id: nuevo.id,
                 tipo_servicio: state.servicioActivo,
                 fecha: hoy,
                 presente: true,
                 registrado_por: state.usuario?.id || null
               }, { onConflict: 'congregante_id,tipo_servicio,fecha' });
+
+              if (errAutoAsis) throw errAutoAsis;
             } catch (e) {
               console.error('Error al registrar asistencia automática:', e);
+              mostrarToast('⚠️ No se pudo marcar como presente automáticamente. Intentá marcarlo manualmente.', 'error');
             }
 
             // Notificación a Ñangarekos (si la política de usuarios lo permite)
@@ -2610,6 +2613,21 @@ async function cargarDatosPastor() {
 
       try {
         state.nangarekoAvisos = await calcularAvisosNangareko(state.misCuidados);
+
+        if ((state.misCuidados?.length || 0) > 0 && (state.nangarekoAvisos?.length || 0) === 0) {
+          const ids = (state.misCuidados || []).map(c => c.id).filter(Boolean);
+          if (ids.length > 0) {
+            const { count, error } = await sb
+              .from('asistencias')
+              .select('id', { count: 'exact', head: true })
+              .in('congregante_id', ids)
+              .in('tipo_servicio', ['miercoles', 'domingo'])
+              .eq('presente', true);
+            if (!error && (count || 0) === 0) {
+              mostrarToast('ℹ️ No hay asistencias registradas (domingo/miércoles) para tus cuidados. Sin asistencia inicial no se generan avisos.', 'error');
+            }
+          }
+        }
       } catch (e) {
         console.error('Error al calcular avisos (Ñangareko):', e);
         mostrarToast('⚠️ No se pudieron calcular los avisos. Revisá tu conexión o permisos.', 'error');
