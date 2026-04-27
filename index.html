@@ -947,10 +947,13 @@
 
       const { data: fichasData, error: fichasError } = await sb
         .from('fichas_nangareko')
-        .select('congregante_id, created_at')
+        .select('congregante_id, created_at, notas_adicionales')
         .in('congregante_id', ids)
+        .eq('nangareko_id', state.usuario.id)
         .order('created_at', { ascending: false });
-      if (fichasError) throw fichasError;
+      if (fichasError) {
+        console.error('Error al leer fichas (Ñangareko):', fichasError);
+      }
 
       const primeraAsistenciaPorId = new Map();
       for (const r of (asistData || [])) {
@@ -961,8 +964,9 @@
       }
 
       const ultimaFichaPorId = new Map();
-      for (const f of (fichasData || [])) {
+      for (const f of ((fichasData || []))) {
         if (!f?.congregante_id || !f?.created_at) continue;
+        if (String(f.notas_adicionales || '').trim() === 'Primer contacto - Asignación inicial') continue;
         if (!ultimaFichaPorId.has(f.congregante_id)) {
           ultimaFichaPorId.set(f.congregante_id, String(f.created_at).slice(0, 10));
         }
@@ -1445,6 +1449,19 @@
             if (error) {
               err.style.display = 'block'; err.textContent = 'Error al guardar: ' + error.message;
               return;
+            }
+
+            try {
+              const hoy = new Date().toISOString().split('T')[0];
+              await sb.from('asistencias').upsert({
+                congregante_id: nuevo.id,
+                tipo_servicio: state.servicioActivo,
+                fecha: hoy,
+                presente: true,
+                registrado_por: state.usuario?.id || null
+              }, { onConflict: 'congregante_id,tipo_servicio,fecha' });
+            } catch (e) {
+              console.error('Error al registrar asistencia automática:', e);
             }
 
             // Notificación a Ñangarekos (si la política de usuarios lo permite)
@@ -2595,6 +2612,7 @@ async function cargarDatosPastor() {
         state.nangarekoAvisos = await calcularAvisosNangareko(state.misCuidados);
       } catch (e) {
         console.error('Error al calcular avisos (Ñangareko):', e);
+        mostrarToast('⚠️ No se pudieron calcular los avisos. Revisá tu conexión o permisos.', 'error');
         state.nangarekoAvisos = [];
       }
 
@@ -2669,7 +2687,7 @@ async function cargarDatosPastor() {
                 <span>${c.telefono || 'No registrado'}</span>
               </div>
               <button class="btn-primary" style="margin-top:12px" onclick="asignarACargo('${c.id}', '${c.nombre}')">
-                🤝 Tomar a mi cargo
+                🤝 Yo me encargo
               </button>
             </div>
           `).join('')}
