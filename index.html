@@ -945,11 +945,26 @@
         .order('fecha', { ascending: true });
       if (asistError) throw asistError;
 
+      const { data: fichasData, error: fichasError } = await sb
+        .from('fichas_nangareko')
+        .select('congregante_id, created_at')
+        .in('congregante_id', ids)
+        .order('created_at', { ascending: false });
+      if (fichasError) throw fichasError;
+
       const primeraAsistenciaPorId = new Map();
       for (const r of (asistData || [])) {
         if (!r?.congregante_id || !r?.fecha) continue;
         if (!primeraAsistenciaPorId.has(r.congregante_id)) {
           primeraAsistenciaPorId.set(r.congregante_id, r);
+        }
+      }
+
+      const ultimaFichaPorId = new Map();
+      for (const f of (fichasData || [])) {
+        if (!f?.congregante_id || !f?.created_at) continue;
+        if (!ultimaFichaPorId.has(f.congregante_id)) {
+          ultimaFichaPorId.set(f.congregante_id, String(f.created_at).slice(0, 10));
         }
       }
 
@@ -990,8 +1005,11 @@
         const base = parseYmd(baseYmd);
         const diasDesdeIngreso = diasEntre(base, hoy);
 
+        const ultimaFichaYmd = ultimaFichaPorId.get(c.id) || null;
+
         let debeHoy = false;
         let atrasadoDesde = null;
+        let fechaAvisoYmd = null;
 
         if (diasDesdeIngreso < 30) {
           let d = addDias(base, 1);
@@ -1008,25 +1026,32 @@
             const ultimaYmd = ultima.toISOString().split('T')[0];
             if (ultimaYmd === hoyYmd) {
               debeHoy = true;
+              fechaAvisoYmd = hoyYmd;
             } else {
               const atraso = diasEntre(ultima, hoy);
               if (atraso >= 1 && atraso <= 7) {
                 debeHoy = true;
                 atrasadoDesde = ultima;
+                fechaAvisoYmd = ultimaYmd;
               }
             }
           }
         } else if (diasDesdeIngreso < 60) {
           if (esLunes(hoy) || esJueves(hoy)) {
             debeHoy = true;
+            fechaAvisoYmd = hoyYmd;
           }
         } else {
           if (esLunes(hoy)) {
             debeHoy = true;
+            fechaAvisoYmd = hoyYmd;
           }
         }
 
         if (debeHoy) {
+          if (fechaAvisoYmd && ultimaFichaYmd && ultimaFichaYmd >= fechaAvisoYmd) {
+            continue;
+          }
           const extra = atrasadoDesde ? ` (atrasado desde ${atrasadoDesde.toLocaleDateString()})` : '';
           avisos.push({
             tipo: 'alimentar',
@@ -1065,6 +1090,7 @@
                 <span class="label">Aviso</span>
                 <span style="font-size:12px">${sanitizar(a.mensaje)}</span>
               </div>
+              <button class="btn-primary" style="margin-top:10px" onclick="abrirFichaContacto('${a.congregante_id}', '${sanitizar(a.nombre)}')">➡️ Ir a tarea</button>
             </div>
           `).join('')
         }
