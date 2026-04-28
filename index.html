@@ -528,8 +528,8 @@
     }
 
     .congregante-foto {
-      width: 42px;
-      height: 42px;
+      width: 84px;
+      height: 84px;
       border-radius: 50%;
       background: var(--gris-medio);
       display: flex;
@@ -625,8 +625,8 @@
     }
 
     .foto-upload {
-      width: 80px;
-      height: 80px;
+      width: 160px;
+      height: 160px;
       border-radius: 50%;
       background: var(--gris-medio);
       border: 2px dashed rgba(255, 255, 255, 0.2);
@@ -891,6 +891,8 @@
 
     let navigationInFlight = false;
     let serviceChangeInFlight = false;
+    let handlingPopState = false;
+    let historyInitialized = false;
 
     let state = {
       loading: true,
@@ -916,6 +918,7 @@
       pastorFichaTarget: null,
       pastorFichasLider: [],
       pastorFichasCongregante: [],
+      pastorLiderazgoDraft: { congreganteId: '', rol: '' },
       // Ñangareko
       misCuidados: [],
       alertasNuevos: [],
@@ -930,6 +933,21 @@
       liderDCFichas: [],
       liderDCAvisos: []
     };
+
+    window.addEventListener('popstate', async (event) => {
+      try {
+        const pantalla = event?.state?.pantalla;
+        if (!pantalla) return;
+        if (!state.session || !state.usuario) return;
+        if (state.pantalla === pantalla) return;
+        handlingPopState = true;
+        await cambiarPantalla(pantalla);
+      } catch (e) {
+        console.error('Error en popstate:', e);
+      } finally {
+        handlingPopState = false;
+      }
+    });
 
     async function calcularAvisosNangareko(cuidados) {
       const hoy = new Date();
@@ -1418,12 +1436,28 @@
       if (!state.session) { app.innerHTML = renderLogin(); bindLogin(); return; }
       if (!state.usuario) { app.innerHTML = renderSetup(); bindSetup(); return; }
 
+      if (!state.usuario?.foto_url) {
+        app.innerHTML = renderSetupFoto();
+        bindSetupFoto();
+        return;
+      }
+
       app.innerHTML = `
       ${renderHeader()}
       <div class="main-content">
         ${renderPantalla()}
       </div>`;
       bindApp();
+    }
+
+    function ensureHistoryInitialized() {
+      if (historyInitialized) return;
+      try {
+        history.replaceState({ pantalla: state.pantalla }, '', location.href);
+        historyInitialized = true;
+      } catch (e) {
+        console.error('No se pudo inicializar history:', e);
+      }
     }
 
     window.cambiarPantalla = async function (pantalla) {
@@ -1440,6 +1474,15 @@
       const pantallaAnterior = state.pantalla;
       state.pantalla = pantalla;
       state.busqueda = '';
+
+      if (!handlingPopState) {
+        ensureHistoryInitialized();
+        try {
+          history.pushState({ pantalla }, '', location.href);
+        } catch (e) {
+          console.error('No se pudo pushState:', e);
+        }
+      }
       try { render(); } catch (e) { console.error('Error al renderizar:', e); }
 
       try {
@@ -1479,6 +1522,34 @@
         clearTimeout(watchdog);
         navigationInFlight = false;
         try { render(); } catch (e) { console.error('Error al renderizar:', e); }
+      }
+    };
+
+    window.actualizarRolLiderazgoCongregante = async function (congreganteId, nuevoRolLiderazgo) {
+      try {
+        const c = (state.congregantes || []).find(x => x?.id === congreganteId) || null;
+        if (c && typeof c?.rol_liderazgo === 'undefined') {
+          mostrarToast('⚠️ Falta crear la columna rol_liderazgo en congregantes (para líderes sin app).', 'error');
+          return;
+        }
+
+        const patch = { rol_liderazgo: nuevoRolLiderazgo || null };
+        const { error } = await withTimeout(
+          sb.from('congregantes').update(patch).eq('id', congreganteId),
+          12000,
+          'actualizar rol liderazgo'
+        );
+        if (error) throw error;
+
+        actualizarCongreganteEnColecciones(congreganteId, patch);
+        mostrarToast('✅ Liderazgo actualizado');
+        render();
+      } catch (e) {
+        console.error('Error al actualizar rol liderazgo (congregante):', e);
+        mostrarToast('⚠️ No se pudo actualizar: ' + (e?.message || 'sin detalle'), 'error');
+        await cargarCongregantes();
+        if (state.usuario?.rol === 'pastor') await cargarDatosPastor();
+        render();
       }
     };
 
@@ -1591,6 +1662,13 @@
         <h2 style="font-family:'Playfair Display',serif;font-size:26px;margin-bottom:12px">Completá tu perfil</h2>
         <p style="color:var(--texto-suave);font-size:14px;margin-bottom:32px;text-align:center">Primera vez ingresando.<br>Completá estos datos para continuar.</p>
         <div class="setup-form">
+          <div style="text-align:center;margin-bottom:20px">
+            <div class="foto-upload" id="setup-foto-upload-btn" onclick="document.getElementById('setup-foto-input').click()">
+              <div id="setup-foto-preview">📷</div>
+              <span>Foto (obligatoria)</span>
+            </div>
+            <input type="file" id="setup-foto-input" accept="image/*" style="display:none" onchange="previsualizarFotoSetup(this)" />
+          </div>
           <div class="input-group"><label>Tu nombre completo</label><input type="text" id="setup-nombre" placeholder="Nombre y apellido" /></div>
           <div class="input-group"><label>Tu rol</label>
             <select id="setup-rol">
@@ -1613,9 +1691,56 @@
         const rol = document.getElementById('setup-rol').value;
         const err = document.getElementById('setup-error');
         if (!nombre || !rol) { err.style.display = 'block'; err.textContent = 'Completá todos los campos.'; return; }
-        const { error } = await sb.from('usuarios').upsert({ id: state.session.user.id, nombre, email: state.session.user.email, rol });
+        if (!state.fotoSetup) { err.style.display = 'block'; err.textContent = 'La foto es obligatoria.'; return; }
+
+        const okSesion = await asegurarSesionVigente();
+        if (!okSesion) return;
+
+        const { error } = await sb.from('usuarios').upsert({ id: state.session.user.id, nombre, email: state.session.user.email, rol, foto_url: state.fotoSetup });
         if (error) { err.style.display = 'block'; err.textContent = 'Error: ' + error.message; return; }
+        state.fotoSetup = null;
         await cargarUsuario(); render();
+      });
+    }
+
+    function renderSetupFoto() {
+      return `
+      <div class="setup-screen">
+        <div style="font-size:64px;margin-bottom:24px">📷</div>
+        <h2 style="font-family:'Playfair Display',serif;font-size:26px;margin-bottom:12px">Subí tu foto de perfil</h2>
+        <p style="color:var(--texto-suave);font-size:14px;margin-bottom:32px;text-align:center">Para continuar, necesitás tener una foto.</p>
+        <div class="setup-form">
+          <div style="text-align:center;margin-bottom:20px">
+            <div class="foto-upload" id="setup2-foto-upload-btn" onclick="document.getElementById('setup2-foto-input').click()">
+              <div id="setup2-foto-preview">📷</div>
+              <span>Foto (obligatoria)</span>
+            </div>
+            <input type="file" id="setup2-foto-input" accept="image/*" style="display:none" onchange="previsualizarFotoSetup2(this)" />
+          </div>
+          <button class="btn-primary" id="btn-setup-foto">Guardar foto</button>
+          <div id="setup2-error" style="display:none" class="error-msg"></div>
+        </div>
+      </div>`;
+    }
+
+    function bindSetupFoto() {
+      document.getElementById('btn-setup-foto')?.addEventListener('click', async () => {
+        const err = document.getElementById('setup2-error');
+        if (!state.fotoSetup2) { err.style.display = 'block'; err.textContent = 'La foto es obligatoria.'; return; }
+
+        const okSesion = await asegurarSesionVigente();
+        if (!okSesion) return;
+
+        const { error } = await withTimeout(
+          sb.from('usuarios').update({ foto_url: state.fotoSetup2 }).eq('id', state.session.user.id),
+          20000,
+          'guardar foto perfil'
+        );
+        if (error) { err.style.display = 'block'; err.textContent = 'Error: ' + error.message; return; }
+
+        state.fotoSetup2 = null;
+        await cargarUsuario();
+        render();
       });
     }
 
@@ -1739,6 +1864,7 @@
         if (rol === 'nangareko') return renderHomeNangareko();
         if (rol === 'lider_dc') return renderHomeLiderDC();
       }
+      if (state.pantalla === 'pastor-estadisticas') return renderPastorEstadisticas();
       if (state.pantalla === 'asistencia') return renderAsistencia();
       if (state.pantalla === 'nuevo-ingreso') return renderNuevoIngreso();
       // Pastor sub-pantallas
@@ -1796,12 +1922,9 @@
         </div>
         
         <div class="info-section">
-          <h3>📊 Asistencia últimos 7 días</h3>
-          <canvas id="asistenciaChart" style="width:100%; max-height:200px; margin-top:10px"></canvas>
-          <div class="info-row" style="margin-top:12px">
-            <span class="label">Promedio semanal</span>
-            <span style="font-weight:bold; color:var(--verde)">${asistenciaPromedio}%</span>
-          </div>
+          <h3>📊 Estadísticas</h3>
+          <div class="info-row"><span class="label">Asistencias (7 días)</span><span style="font-weight:bold; color:var(--verde)">${asistenciaPromedio}%</span></div>
+          <button class="btn-secondary" style="margin-top:12px" onclick="cambiarPantalla('pastor-estadisticas')">Ver detalle</button>
         </div>
         
         <div class="info-section">
@@ -1918,6 +2041,14 @@ async function cargarDatosPastor() {
       state.asistenciaPromedio = 0;
     }
 
+    state.pastorStats = {
+      domingo_presentes_7d: asistenciasDomingo.filter(a => a.presente).length,
+      miercoles_presentes_7d: asistenciasMiercoles.filter(a => a.presente).length,
+      total_congregantes: (state.congregantes || []).length,
+      atendidos_por_nangareko: (state.congregantes || []).filter(c => Boolean(c?.nangareko_id)).length,
+      en_dc: (state.congregantes || []).filter(c => Boolean(c?.grupo_dc_id) && ['en_dc', 'graduado'].includes(c?.estado)).length
+    };
+
     if (ultimosRes.error) {
       console.error('Error al cargar últimos ingresos (Pastor):', ultimosRes.error);
       state.ultimosCongregantes = [];
@@ -1939,51 +2070,52 @@ async function cargarDatosPastor() {
       state.gruposDC = gruposRes.data || [];
     }
 
-    setTimeout(() => dibujarGraficoAsistencia(), 100);
+    // Gráfico removido: ahora existe pantalla de estadísticas.
 }
 
-    function dibujarGraficoAsistencia() {
-      const canvas = document.getElementById('asistenciaChart');
-      if (!canvas) return;
+    function renderPastorEstadisticas() {
+      const s = state.pastorStats || {};
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>📊 Estadísticas</h3>
+          <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+        </div>
 
-      const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-      const asistenciasPorDia = [65, 70, 82, 68, 72, 85, 90];
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Asistencias (últimos 7 días)</h3>
+          <div class="info-row"><span class="label">Domingo presentes</span><span>${s.domingo_presentes_7d ?? '—'}</span></div>
+          <div class="info-row"><span class="label">Miércoles presentes</span><span>${s.miercoles_presentes_7d ?? '—'}</span></div>
+        </div>
 
-      new Chart(canvas, {
-        type: 'line',
-        data: {
-          labels: diasSemana,
-          datasets: [{
-            label: 'Asistencia %',
-            data: asistenciasPorDia,
-            borderColor: '#c0392b',
-            backgroundColor: 'rgba(192, 57, 43, 0.1)',
-            tension: 0.3,
-            fill: true
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          plugins: {
-            legend: { labels: { color: '#b0a090' } }
-          },
-          scales: {
-            y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#b0a090' } },
-            x: { ticks: { color: '#b0a090' } }
-          }
-        }
-      });
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Cobertura</h3>
+          <div class="info-row"><span class="label">Total congregantes</span><span>${s.total_congregantes ?? '—'}</span></div>
+          <div class="info-row"><span class="label">Atendidos por Ñangareko</span><span>${s.atendidos_por_nangareko ?? '—'}</span></div>
+          <div class="info-row"><span class="label">En DC</span><span>${s.en_dc ?? '—'}</span></div>
+        </div>
+      </div>`;
     }
 
     function renderPastorLideres() {
       const usuarios = state.lideres || [];
+      const congregantes = state.congregantes || [];
       const roles = [
         { value: 'pastor', label: 'Pastor' },
         { value: 'nangareko', label: 'Ñangareko' },
         { value: 'hory', label: 'Hory' },
         { value: 'lider_dc', label: 'Líder DC' }
       ];
+
+      const rolesLiderazgo = [
+        { value: '', label: '(Sin rol)' },
+        { value: 'hory', label: 'Hory' },
+        { value: 'nangareko', label: 'Ñangareko' },
+        { value: 'lider_dc', label: 'Líder DC' }
+      ];
+
+      const draft = state.pastorLiderazgoDraft || { congreganteId: '', rol: '' };
+      const listaCong = congregantes.slice().sort((a, b) => String(a?.nombre || '').localeCompare(String(b?.nombre || '')));
 
       const porRol = {
         pastor: usuarios.filter(u => u.rol === 'pastor'),
@@ -2004,14 +2136,44 @@ async function cargarDatosPastor() {
               <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.06)">
                 <div class="info-row" style="align-items:center">
                   <div style="display:flex;align-items:center;gap:10px">
-                    <div class="congregante-foto" style="width:38px;height:38px">${u.foto_url ? `<img src="${sanitizar(u.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                    <div class="congregante-foto" style="width:76px;height:76px">${u.foto_url ? `<img src="${sanitizar(u.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
                     <div>
                       <div class="label" style="cursor:pointer" onclick="verDetalleLider('${u.id}')">${sanitizar(u.nombre || '(Sin nombre)')}</div>
-                      <div style="font-size:12px;color:var(--texto-suave)">${sanitizar(u.email || '')}</div>
+                      <div style="font-size:12px;color:var(--texto-suave)">${sanitizar((roles.find(r => r.value === u.rol)?.label) || u.rol || '')}</div>
                     </div>
                   </div>
                   <select style="width:160px" onchange="actualizarRolUsuario('${u.id}', this.value)">
                     ${roles.map(r => `<option value="${r.value}" ${u.rol === r.value ? 'selected' : ''}>${r.label}</option>`).join('')}
+                  </select>
+                </div>
+              </div>`;
+            }).join('')
+          }
+        </div>`;
+      }
+
+      function renderListaLiderazgoCongregantes() {
+        const lista = congregantes.filter(c => c && c.rol_liderazgo);
+        return `
+        <div class="info-section" style="margin-bottom:12px">
+          <h3 style="margin:0 0 12px 0">Líderes (sin app) <span style="font-size:12px;color:var(--texto-suave)">(${lista.length})</span></h3>
+          ${lista.length === 0 ?
+            `<div class="info-row"><span class="label">Sin registros</span></div>` :
+            lista.map(c => {
+              const iniciales = getIniciales(c.nombre || '');
+              const rolLbl = (rolesLiderazgo.find(r => r.value === (c.rol_liderazgo || ''))?.label) || c.rol_liderazgo || '';
+              return `
+              <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.06)">
+                <div class="info-row" style="align-items:center">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div class="congregante-foto" style="width:76px;height:76px">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                    <div>
+                      <div class="label">${sanitizar(c.nombre || '(Sin nombre)')}</div>
+                      <div style="font-size:12px;color:var(--texto-suave)">${sanitizar(rolLbl)}</div>
+                    </div>
+                  </div>
+                  <select style="width:160px" onchange="actualizarRolLiderazgoCongregante('${c.id}', this.value)">
+                    ${rolesLiderazgo.map(r => `<option value="${r.value}" ${(c.rol_liderazgo || '') === r.value ? 'selected' : ''}>${r.label}</option>`).join('')}
                   </select>
                 </div>
               </div>`;
@@ -2029,6 +2191,24 @@ async function cargarDatosPastor() {
 
         <button class="btn-primary" style="margin-bottom:16px" onclick="pastorAgregarLider()">➕ Agregar líder</button>
 
+        <div class="info-section" style="margin-bottom:12px">
+          <h3 style="margin:0 0 12px 0">➕ Marcar líder (sin app)</h3>
+          <div class="info-row">
+            <span class="label">Congregante</span>
+            <select style="width:200px" onchange="setPastorLiderazgoDraftCongregante(this.value)">
+              <option value="" ${!draft.congreganteId ? 'selected' : ''}>(Seleccionar)</option>
+              ${listaCong.map(c => `<option value="${c.id}" ${draft.congreganteId === c.id ? 'selected' : ''}>${sanitizar(c.nombre || '(Sin nombre)')}</option>`).join('')}
+            </select>
+          </div>
+          <div class="info-row">
+            <span class="label">Rol</span>
+            <select style="width:200px" onchange="setPastorLiderazgoDraftRol(this.value)">
+              ${rolesLiderazgo.filter(r => r.value !== '').map(r => `<option value="${r.value}" ${draft.rol === r.value ? 'selected' : ''}>${r.label}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn-secondary" style="margin-top:10px" onclick="guardarPastorLiderazgoDraft()">Guardar</button>
+        </div>
+
         ${usuarios.length === 0 ?
           `<div class="coming-soon">
             <div class="big-icon">👥</div>
@@ -2036,6 +2216,7 @@ async function cargarDatosPastor() {
             <p>Si esto no es correcto, revisá permisos/RLS de la tabla usuarios</p>
           </div>` :
           (
+            renderListaLiderazgoCongregantes() +
             renderLista('Horys', porRol.hory) +
             renderLista('Ñangarekos', porRol.nangareko) +
             renderLista('Líderes de DC', porRol.lider_dc) +
@@ -2045,6 +2226,46 @@ async function cargarDatosPastor() {
       </div>
     `;
     }
+
+    window.setPastorLiderazgoDraftCongregante = function (congreganteId) {
+      if (!state.pastorLiderazgoDraft) state.pastorLiderazgoDraft = { congreganteId: '', rol: '' };
+      state.pastorLiderazgoDraft.congreganteId = congreganteId || '';
+      render();
+    };
+
+    window.setPastorLiderazgoDraftRol = function (rol) {
+      if (!state.pastorLiderazgoDraft) state.pastorLiderazgoDraft = { congreganteId: '', rol: '' };
+      state.pastorLiderazgoDraft.rol = rol || '';
+      render();
+    };
+
+    window.guardarPastorLiderazgoDraft = async function () {
+      try {
+        const congreganteId = String(state.pastorLiderazgoDraft?.congreganteId || '');
+        const rol = String(state.pastorLiderazgoDraft?.rol || '');
+        if (!congreganteId) {
+          mostrarToast('⚠️ Seleccioná un congregante', 'error');
+          return;
+        }
+        if (!rol || !['hory', 'nangareko', 'lider_dc'].includes(rol)) {
+          mostrarToast('⚠️ Seleccioná un rol válido', 'error');
+          return;
+        }
+
+        const ejemplo = (state.congregantes || [])[0];
+        if (typeof ejemplo?.rol_liderazgo === 'undefined') {
+          mostrarToast('⚠️ Falta crear la columna rol_liderazgo en congregantes (para líderes sin app).', 'error');
+          return;
+        }
+
+        await actualizarRolLiderazgoCongregante(congreganteId, rol);
+        state.pastorLiderazgoDraft = { congreganteId: '', rol: '' };
+        render();
+      } catch (e) {
+        console.error('Error al guardar liderazgo draft:', e);
+        mostrarToast('⚠️ No se pudo guardar', 'error');
+      }
+    };
 
     function renderPastorLiderDetalle() {
       const usuarioId = state.pastorLiderSeleccionadoId;
@@ -2072,10 +2293,10 @@ async function cargarDatosPastor() {
 
         <div class="info-section" style="margin-bottom:12px">
           <div style="display:flex;gap:12px;align-items:center">
-            <div class="congregante-foto" style="width:56px;height:56px">${u.foto_url ? `<img src="${sanitizar(u.foto_url)}" />` : sanitizar(getIniciales(u.nombre || '') || '?')}</div>
+            <div class="congregante-foto" style="width:112px;height:112px">${u.foto_url ? `<img src="${sanitizar(u.foto_url)}" />` : sanitizar(getIniciales(u.nombre || '') || '?')}</div>
             <div>
               <div style="font-size:16px;font-weight:700">${sanitizar(u.nombre || '(Sin nombre)')}</div>
-              <div style="font-size:12px;color:var(--texto-suave)">${sanitizar(u.email || '')}</div>
+              <div style="font-size:12px;color:var(--texto-suave)">${sanitizar(u.rol || '')}</div>
             </div>
           </div>
         </div>
@@ -2146,7 +2367,7 @@ async function cargarDatosPastor() {
               <div class="info-section" style="margin-bottom:12px">
                 <div class="info-row">
                   <div style="display:flex;align-items:center;gap:10px">
-                    <div class="congregante-foto" style="width:38px;height:38px">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                    <div class="congregante-foto" style="width:76px;height:76px">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
                     <span class="label">${sanitizar(c.nombre)}</span>
                   </div>
                   <span class="estado-${c.estado}">${estadoLabel(c.estado)}</span>
@@ -3146,17 +3367,26 @@ async function cargarDatosPastor() {
 
           <div class="info-row">
             <span class="label">En Añua</span>
-            <input type="checkbox" ${anuaOk ? 'checked' : ''} ${anuaOk ? 'disabled' : ''} ${!tieneColYaAnua ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'anua')" />
+            <label class="switch">
+              <input type="checkbox" ${anuaOk ? 'checked' : ''} ${anuaOk ? 'disabled' : ''} ${!tieneColYaAnua ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'anua')" />
+              <span class="slider"></span>
+            </label>
           </div>
 
           <div class="info-row">
             <span class="label">Bautizado</span>
-            <input type="checkbox" ${bautismoOk ? 'checked' : ''} ${bautismoOk ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'bautizado')" />
+            <label class="switch">
+              <input type="checkbox" ${bautismoOk ? 'checked' : ''} ${bautismoOk ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'bautizado')" />
+              <span class="slider"></span>
+            </label>
           </div>
 
           <div class="info-row">
             <span class="label">En DC</span>
-            <input type="checkbox" id="sw-dc-${targetId}" ${dcOk ? 'checked' : ''} ${dcOk ? 'disabled' : ''} onchange="const sel=document.getElementById('sel-dc-${targetId}'); sel.disabled=!this.checked; if(this.checked){ try{ sel.focus(); }catch(e){} try{ sel.click(); }catch(e){} }" />
+            <label class="switch">
+              <input type="checkbox" id="sw-dc-${targetId}" ${dcOk ? 'checked' : ''} ${dcOk ? 'disabled' : ''} onchange="const sel=document.getElementById('sel-dc-${targetId}'); sel.disabled=!this.checked; if(this.checked){ try{ sel.focus(); }catch(e){} try{ sel.click(); }catch(e){} }" />
+              <span class="slider"></span>
+            </label>
           </div>
 
           <div class="info-row">
@@ -3169,7 +3399,10 @@ async function cargarDatosPastor() {
 
           <div class="info-row">
             <span class="label">Graduado</span>
-            <input type="checkbox" ${estadoActual === 'graduado' ? 'checked' : ''} ${estadoActual === 'graduado' ? 'disabled' : ''} ${(!puedeGraduar || !tieneColYaAnua) ? 'disabled' : ''} onchange="actualizarEstadoCongregante('${targetId}', 'graduado')" />
+            <label class="switch">
+              <input type="checkbox" ${estadoActual === 'graduado' ? 'checked' : ''} ${estadoActual === 'graduado' ? 'disabled' : ''} ${(!puedeGraduar || !tieneColYaAnua) ? 'disabled' : ''} onchange="actualizarEstadoCongregante('${targetId}', 'graduado')" />
+              <span class="slider"></span>
+            </label>
           </div>
 
           <button class="btn-primary" style="margin-top:12px" onclick="guardarPerfilCongregante('${targetId}')">💾 Guardar datos</button>
@@ -4125,29 +4358,87 @@ async function cargarDatosPastor() {
 
     window.previsualizarFoto = function (input) {
       if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = e => {
-          state.fotoNuevo = e.target.result;
+        procesarImagenArchivo(input.files[0]).then((dataUrl) => {
+          state.fotoNuevo = dataUrl;
           const preview = document.getElementById('foto-preview');
-          if (preview) preview.innerHTML = `<img src="${e.target.result}" style="width:80px;height:80px;object-fit:cover;border-radius:50%" />`;
+          if (preview) preview.innerHTML = `<img src="${dataUrl}" style="width:160px;height:160px;object-fit:cover;border-radius:50%" />`;
           const btn = document.getElementById('foto-upload-btn');
           if (btn) btn.querySelector('span').textContent = 'Cambiar foto';
-        };
-        reader.readAsDataURL(input.files[0]);
+        }).catch((e) => {
+          console.error('Error al procesar foto:', e);
+          mostrarToast('⚠️ No se pudo procesar la foto. Probá otra imagen.', 'error');
+        });
+      }
+    };
+
+    window.previsualizarFotoSetup = function (input) {
+      if (input.files && input.files[0]) {
+        procesarImagenArchivo(input.files[0]).then((dataUrl) => {
+          state.fotoSetup = dataUrl;
+          const preview = document.getElementById('setup-foto-preview');
+          if (preview) preview.innerHTML = `<img src="${dataUrl}" style="width:160px;height:160px;object-fit:cover;border-radius:50%" />`;
+        }).catch((e) => {
+          console.error('Error al procesar foto setup:', e);
+          mostrarToast('⚠️ No se pudo procesar la foto. Probá otra imagen.', 'error');
+        });
+      }
+    };
+
+    window.previsualizarFotoSetup2 = function (input) {
+      if (input.files && input.files[0]) {
+        procesarImagenArchivo(input.files[0]).then((dataUrl) => {
+          state.fotoSetup2 = dataUrl;
+          const preview = document.getElementById('setup2-foto-preview');
+          if (preview) preview.innerHTML = `<img src="${dataUrl}" style="width:160px;height:160px;object-fit:cover;border-radius:50%" />`;
+        }).catch((e) => {
+          console.error('Error al procesar foto setup2:', e);
+          mostrarToast('⚠️ No se pudo procesar la foto. Probá otra imagen.', 'error');
+        });
       }
     };
 
     window.previsualizarFotoEdicion = function (input) {
       if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = e => {
-          state.fotoEdicion = e.target.result;
+        procesarImagenArchivo(input.files[0]).then((dataUrl) => {
+          state.fotoEdicion = dataUrl;
           const preview = document.getElementById('edit-foto-preview');
-          if (preview) preview.innerHTML = `<img src="${e.target.result}" alt="foto" style="width:100%;height:100%;object-fit:cover;border-radius:12px" />`;
-        };
-        reader.readAsDataURL(input.files[0]);
+          if (preview) preview.innerHTML = `<img src="${dataUrl}" alt="foto" style="width:100%;height:100%;object-fit:cover;border-radius:12px" />`;
+        }).catch((e) => {
+          console.error('Error al procesar foto edición:', e);
+          mostrarToast('⚠️ No se pudo procesar la foto. Probá otra imagen.', 'error');
+        });
       }
     };
+
+    async function procesarImagenArchivo(file) {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(String(e.target.result || ''));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = dataUrl;
+      });
+
+      const maxDim = 320;
+      const w = img.width;
+      const h = img.height;
+      const scale = Math.min(1, maxDim / Math.max(w, h));
+      const tw = Math.max(1, Math.round(w * scale));
+      const th = Math.max(1, Math.round(h * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = tw;
+      canvas.height = th;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, tw, th);
+      return canvas.toDataURL('image/jpeg', 0.72);
+    }
 
     window.guardarPerfilCongregante = async function (congreganteId) {
       const nombre = document.getElementById('edit-nombre')?.value?.trim();
@@ -4166,6 +4457,8 @@ async function cargarDatosPastor() {
       if (state.fotoEdicion) update.foto_url = state.fotoEdicion;
 
       try {
+        const okSesion = await asegurarSesionVigente();
+        if (!okSesion) return;
         const { error } = await withTimeout(
           sb.from('congregantes').update(update).eq('id', congreganteId),
           12000,
