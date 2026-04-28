@@ -1482,6 +1482,53 @@
       }
     };
 
+    window.activarHitoCongregante = async function (congreganteId, hito) {
+      try {
+        const c = (state.misCuidados || []).find(x => x?.id === congreganteId)
+          || (state.congregantes || []).find(x => x?.id === congreganteId)
+          || (state.miembrosGrupo || []).find(x => x?.id === congreganteId)
+          || null;
+
+        if (!c) {
+          mostrarToast('⚠️ No se encontró el congregante en memoria. Probá recargar.', 'error');
+          return;
+        }
+
+        const patch = {};
+        if (hito === 'anua') {
+          if (typeof c?.ya_anua === 'undefined') {
+            mostrarToast('⚠️ Falta crear la columna ya_anua en congregantes.', 'error');
+            return;
+          }
+          if (c?.ya_anua) return;
+          patch.ya_anua = true;
+          if (!['bautizado', 'en_dc', 'graduado'].includes(c?.estado)) patch.estado = 'en_anua';
+        } else if (hito === 'bautizado') {
+          if (c?.ya_bautizado) return;
+          patch.ya_bautizado = true;
+          if (!['en_dc', 'graduado'].includes(c?.estado)) patch.estado = 'bautizado';
+        } else {
+          return;
+        }
+
+        const { error } = await withTimeout(
+          sb.from('congregantes').update(patch).eq('id', congreganteId),
+          12000,
+          'activar hito'
+        );
+        if (error) throw error;
+
+        actualizarCongreganteEnColecciones(congreganteId, patch);
+        mostrarToast('✅ Actualizado');
+        render();
+      } catch (e) {
+        console.error('Error al activar hito:', e);
+        mostrarToast('⚠️ No se pudo actualizar: ' + (e?.message || 'sin detalle'), 'error');
+        await cargarCongregantes();
+        render();
+      }
+    };
+
     window.logout = async function () {
       try {
         await withTimeout(sb.auth.signOut(), 12000, 'cerrar sesión');
@@ -2524,7 +2571,34 @@ async function cargarDatosPastor() {
 
     window.actualizarEstadoCongregante = async function (congreganteId, nuevoEstado) {
       try {
+        if (nuevoEstado === 'graduado') {
+          const c = (state.misCuidados || []).find(x => x?.id === congreganteId)
+            || (state.congregantes || []).find(x => x?.id === congreganteId)
+            || (state.miembrosGrupo || []).find(x => x?.id === congreganteId)
+            || null;
+
+          if (typeof c?.ya_anua === 'undefined') {
+            mostrarToast('⚠️ Falta crear la columna ya_anua en congregantes para controlar el requisito de Añua.', 'error');
+            return;
+          }
+
+          const anuaOk = Boolean(c?.ya_anua);
+          const bautismoOk = Boolean(c?.ya_bautizado);
+          const dcOk = Boolean(c?.grupo_dc_id);
+
+          if (!anuaOk || !bautismoOk || !dcOk) {
+            mostrarToast('⚠️ Para graduar debe completar: Añua + Bautismo + estar en un DC.', 'error');
+            return;
+          }
+        }
+
         const patch = { estado: nuevoEstado };
+        if (nuevoEstado === 'en_anua') {
+          patch.ya_anua = true;
+        }
+        if (nuevoEstado === 'bautizado') {
+          patch.ya_bautizado = true;
+        }
         if (nuevoEstado === 'graduado') {
           patch.nangareko_id = null;
         }
@@ -2561,14 +2635,24 @@ async function cargarDatosPastor() {
     window.actualizarGrupoDCCongregante = async function (congreganteId, grupoIdValue) {
       const grupo_dc_id = grupoIdValue ? grupoIdValue : null;
       try {
+        const c = (state.misCuidados || []).find(x => x?.id === congreganteId)
+          || (state.congregantes || []).find(x => x?.id === congreganteId)
+          || (state.miembrosGrupo || []).find(x => x?.id === congreganteId)
+          || null;
+
+        const patch = { grupo_dc_id };
+        if (grupo_dc_id && !['en_dc', 'graduado'].includes(c?.estado)) {
+          patch.estado = 'en_dc';
+        }
+
         const { error } = await withTimeout(
-          sb.from('congregantes').update({ grupo_dc_id }).eq('id', congreganteId),
+          sb.from('congregantes').update(patch).eq('id', congreganteId),
           12000,
           'actualizar grupo dc'
         );
         if (error) throw error;
 
-        actualizarCongreganteEnColecciones(congreganteId, { grupo_dc_id });
+        actualizarCongreganteEnColecciones(congreganteId, patch);
         mostrarToast('✅ Grupo DC actualizado');
         render();
       } catch (e) {
@@ -2831,8 +2915,12 @@ async function cargarDatosPastor() {
 
       if (gruposRes?.error) {
         console.error('Error al cargar grupos DC (Ñangareko):', gruposRes.error);
+        mostrarToast('⚠️ No se pudieron cargar los Grupos DC (permisos/RLS).', 'error');
       } else {
         state.gruposDC = gruposRes.data || [];
+        if (state.gruposDC.length === 0) {
+          mostrarToast('ℹ️ No hay Grupos DC cargados. Pedile al pastor que cree grupos o revisá permisos.', 'error');
+        }
       }
 
       const fechaLimite = new Date();
@@ -2986,6 +3074,19 @@ async function cargarDatosPastor() {
         ((state.misCuidados || []).find(c => c.id === targetId) || (state.congregantes || []).find(c => c.id === targetId)) :
         null;
 
+      const puedeGraduar = (() => {
+        const anuaOk = Boolean(congregante?.ya_anua);
+        const bautismoOk = Boolean(congregante?.ya_bautizado);
+        const dcOk = Boolean(congregante?.grupo_dc_id);
+        return anuaOk && bautismoOk && dcOk;
+      })();
+
+      const tieneColYaAnua = typeof congregante?.ya_anua !== 'undefined';
+      const anuaOk = Boolean(congregante?.ya_anua);
+      const bautismoOk = Boolean(congregante?.ya_bautizado);
+      const dcOk = Boolean(congregante?.grupo_dc_id);
+      const estadoActual = congregante?.estado || 'nuevo';
+
       if (!targetId) {
         const cuidados = state.misCuidados || [];
         return `
@@ -3039,24 +3140,36 @@ async function cargarDatosPastor() {
           </div>
 
           <div class="info-row">
-            <span class="label">Estado</span>
-            <select style="width:200px" onchange="actualizarEstadoCongregante('${targetId}', this.value)">
-              <option value="nuevo" ${(congregante?.estado || 'nuevo') === 'nuevo' ? 'selected' : ''}>${estadoLabel('nuevo')}</option>
-              <option value="visita" ${(congregante?.estado || '') === 'visita' ? 'selected' : ''}>${estadoLabel('visita')}</option>
-              <option value="en_proceso" ${(congregante?.estado || '') === 'en_proceso' ? 'selected' : ''}>${estadoLabel('en_proceso')}</option>
-              <option value="en_anua" ${(congregante?.estado || '') === 'en_anua' ? 'selected' : ''}>${estadoLabel('en_anua')}</option>
-              <option value="bautizado" ${(congregante?.estado || '') === 'bautizado' ? 'selected' : ''}>${estadoLabel('bautizado')}</option>
-              <option value="en_dc" ${(congregante?.estado || '') === 'en_dc' ? 'selected' : ''}>${estadoLabel('en_dc')}</option>
-              <option value="graduado" ${(congregante?.estado || '') === 'graduado' ? 'selected' : ''}>${estadoLabel('graduado')}</option>
-            </select>
+            <span class="label">Progreso</span>
+            <span class="estado-${estadoActual}">${estadoLabel(estadoActual)}</span>
+          </div>
+
+          <div class="info-row">
+            <span class="label">En Añua</span>
+            <input type="checkbox" ${anuaOk ? 'checked' : ''} ${anuaOk ? 'disabled' : ''} ${!tieneColYaAnua ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'anua')" />
+          </div>
+
+          <div class="info-row">
+            <span class="label">Bautizado</span>
+            <input type="checkbox" ${bautismoOk ? 'checked' : ''} ${bautismoOk ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'bautizado')" />
+          </div>
+
+          <div class="info-row">
+            <span class="label">En DC</span>
+            <input type="checkbox" id="sw-dc-${targetId}" ${dcOk ? 'checked' : ''} ${dcOk ? 'disabled' : ''} onchange="const sel=document.getElementById('sel-dc-${targetId}'); sel.disabled=!this.checked; if(this.checked){ try{ sel.focus(); }catch(e){} try{ sel.click(); }catch(e){} }" />
           </div>
 
           <div class="info-row">
             <span class="label">Grupo DC</span>
-            <select style="width:200px" onchange="actualizarGrupoDCCongregante('${targetId}', this.value)">
+            <select id="sel-dc-${targetId}" style="width:200px" ${dcOk ? '' : 'disabled'} onchange="actualizarGrupoDCCongregante('${targetId}', this.value)">
               <option value="" ${!congregante?.grupo_dc_id ? 'selected' : ''}>(Sin grupo)</option>
               ${grupos.map(g => `<option value="${g.id}" ${congregante?.grupo_dc_id === g.id ? 'selected' : ''}>${sanitizar(g.nombre)}</option>`).join('')}
             </select>
+          </div>
+
+          <div class="info-row">
+            <span class="label">Graduado</span>
+            <input type="checkbox" ${estadoActual === 'graduado' ? 'checked' : ''} ${estadoActual === 'graduado' ? 'disabled' : ''} ${(!puedeGraduar || !tieneColYaAnua) ? 'disabled' : ''} onchange="actualizarEstadoCongregante('${targetId}', 'graduado')" />
           </div>
 
           <button class="btn-primary" style="margin-top:12px" onclick="guardarPerfilCongregante('${targetId}')">💾 Guardar datos</button>
