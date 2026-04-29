@@ -50,6 +50,14 @@
       overflow-x: hidden;
     }
 
+    body.home-body {
+      background-image: linear-gradient(rgba(0, 0, 0, 0.68), rgba(0, 0, 0, 0.68)), url('fondo_inicio.jpg');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center top;
+      background-attachment: scroll;
+    }
+
     /* ===== LOGIN ===== */
     .login-screen {
       min-height: 100vh;
@@ -1490,6 +1498,8 @@
         bindSetupFoto();
         return;
       }
+
+      document.body.classList.toggle('home-body', state.pantalla === 'home');
 
       app.innerHTML = `
       ${renderHeader()}
