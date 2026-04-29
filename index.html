@@ -946,6 +946,8 @@
     let realtimeRefreshTimer = null;
     let realtimeRefreshInFlight = false;
 
+    let sessionCheckInFlight = false;
+
     let navigationInFlight = false;
     let serviceChangeInFlight = false;
     let handlingPopState = false;
@@ -1383,6 +1385,8 @@
     }
 
     async function asegurarSesionVigente() {
+      if (sessionCheckInFlight) return true;
+      sessionCheckInFlight = true;
       try {
         const { data: { session } } = await withTimeout(sb.auth.getSession(), 12000, 'verificar sesión');
         state.session = session;
@@ -1404,9 +1408,43 @@
         }
         return true;
       } catch (e) {
-        console.error('Error verificando/refrescando sesión:', e);
-        mostrarToast('⚠️ Problema de conexión/sesión. Probá recargar.', 'error');
+        console.error('Error al asegurar sesión:', e);
+        mostrarToast('⚠️ No se pudo verificar sesión. Probá refrescar.', 'error');
         return false;
+      } finally {
+        sessionCheckInFlight = false;
+      }
+    }
+
+    async function guardarOneSignalIdsEnUsuario({ osId, pushId }) {
+      try {
+        if (!osId && !pushId) return;
+        if (!state.session?.user?.id) return;
+        const key = `onesignal_saved_${state.session.user.id}`;
+        const prev = localStorage.getItem(key);
+        const nuevo = JSON.stringify({ osId: osId || null, pushId: pushId || null });
+        if (prev === nuevo) return;
+
+        const patch = {};
+        if (osId) patch.onesignal_id = osId;
+        if (pushId) patch.onesignal_push_id = pushId;
+        if (Object.keys(patch).length === 0) return;
+
+        const ejemplo = state.usuario;
+        if (ejemplo && (typeof ejemplo.onesignal_id === 'undefined') && (typeof ejemplo.onesignal_push_id === 'undefined')) {
+          console.warn('Faltan columnas onesignal_id / onesignal_push_id en usuarios.');
+          return;
+        }
+
+        const { error } = await withTimeout(
+          sb.from('usuarios').update(patch).eq('id', state.session.user.id),
+          12000,
+          'guardar onesignal ids'
+        );
+        if (error) throw error;
+        localStorage.setItem(key, nuevo);
+      } catch (e) {
+        console.error('No se pudieron guardar IDs de OneSignal en usuarios:', e);
       }
     }
 
@@ -4817,15 +4855,21 @@ async function cargarDatosPastor() {
 
       document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible' && state.session) {
-          await asegurarSesionVigente();
+          try { await asegurarSesionVigente(); } catch (e) { console.error(e); }
         }
       });
 
       window.addEventListener('focus', async () => {
         if (state.session) {
-          await asegurarSesionVigente();
+          try { await asegurarSesionVigente(); } catch (e) { console.error(e); }
         }
       });
+
+      setInterval(async () => {
+        if (state.session) {
+          try { await asegurarSesionVigente(); } catch (e) { console.error(e); }
+        }
+      }, 5 * 60 * 1000);
 
       if (session) {
         await cargarUsuario();
@@ -4927,6 +4971,7 @@ async function cargarDatosPastor() {
 				const osId = await OneSignal.User?.onesignalId;
 				const pushId = await OneSignal.User?.PushSubscription?.id;
 				console.log('OneSignal:', { osId, pushId, scopeBase });
+				await guardarOneSignalIdsEnUsuario({ osId, pushId });
 			} catch (e) {
 				console.error('Diagnóstico OneSignal error:', e);
 			}
