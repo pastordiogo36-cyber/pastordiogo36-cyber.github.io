@@ -976,6 +976,8 @@
       pastorFichasLider: [],
       pastorFichasCongregante: [],
       pastorLiderazgoDraft: { congreganteId: '', rol: '' },
+      pastorUltimoNangarekoPorCongregante: {},
+      pastorGrupoSeleccionadoId: null,
       // Ñangareko
       misCuidados: [],
       alertasNuevos: [],
@@ -988,7 +990,10 @@
       asistenciaDCHoy: {},
       liderDCContactos: [],
       liderDCFichas: [],
-      liderDCAvisos: []
+      liderDCAvisos: [],
+      // Asistencia (Hory)
+      usuariosAsistencia: [],
+      asistenciaTotalActual: 0
     };
 
     window.addEventListener('popstate', async (event) => {
@@ -1551,6 +1556,9 @@
 
         if (pantalla === 'asistencia') {
           await withTimeout(cargarCongregantes(), 20000, 'cargar congregantes');
+          if (state.usuario?.rol === 'hory') {
+            await withTimeout(cargarUsuariosAsistencia(), 20000, 'cargar usuarios asistencia');
+          }
           const cache = state.asistenciasPorServicio?.[state.servicioActivo];
           if (cache && Object.keys(cache).length > 0) {
             state.asistenciasHoy = { ...cache };
@@ -1939,6 +1947,7 @@
       if (state.pantalla === 'pastor-calendario') return renderPastorCalendario();
       if (state.pantalla === 'pastor-alertas') return renderPastorAlertas();
       if (state.pantalla === 'pastor-grupos') return renderPastorGrupos();
+      if (state.pantalla === 'pastor-grupo-detalle') return renderPastorGrupoDetalle();
       // Ñangareko sub-pantallas
       if (state.pantalla === 'nangareko-alertas') return renderNangarekoAlertas();
       if (state.pantalla === 'nangareko-avisos') return renderNangarekoAvisos();
@@ -2131,6 +2140,33 @@ async function cargarDatosPastor() {
       state.gruposDC = [];
     } else {
       state.gruposDC = gruposRes.data || [];
+    }
+
+    try {
+      const ids = (state.congregantes || []).map(c => c?.id).filter(Boolean);
+      if (ids.length > 0) {
+        const { data, error } = await withTimeout(
+          sb.from('fichas_nangareko')
+            .select('congregante_id, nangareko_id, created_at')
+            .in('congregante_id', ids)
+            .order('created_at', { ascending: false })
+            .limit(2000),
+          20000,
+          'cargar ultimo nangareko'
+        );
+        if (error) throw error;
+        const map = {};
+        for (const f of (data || [])) {
+          if (!f?.congregante_id || !f?.nangareko_id) continue;
+          if (!map[f.congregante_id]) map[f.congregante_id] = f.nangareko_id;
+        }
+        state.pastorUltimoNangarekoPorCongregante = map;
+      } else {
+        state.pastorUltimoNangarekoPorCongregante = {};
+      }
+    } catch (e) {
+      console.error('Error al cargar ultimo nangareko por congregante:', e);
+      state.pastorUltimoNangarekoPorCongregante = {};
     }
 
     // Gráfico removido: ahora existe pantalla de estadísticas.
@@ -2422,7 +2458,8 @@ async function cargarDatosPastor() {
           `<div style="text-align:center;color:var(--texto-suave);padding:32px;font-size:14px">No se encontraron resultados.</div>` :
           lista.map(c => {
             const grupoActual = c.grupo_dc_id ? grupos.find(g => g.id === c.grupo_dc_id) : null;
-            const nangareko = c.nangareko_id ? nangarekos.find(n => n.id === c.nangareko_id) : null;
+            const nangarekoId = c.nangareko_id || state.pastorUltimoNangarekoPorCongregante?.[c.id] || null;
+            const nangareko = nangarekoId ? nangarekos.find(n => n.id === nangarekoId) : null;
             const iniciales = (c.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
             return `
               <div class="info-section" style="margin-bottom:12px">
@@ -2587,7 +2624,7 @@ async function cargarDatosPastor() {
             <p>Creá tu primer grupo de discipulado</p>
           </div>` :
           grupos.map(g => `
-            <div class="info-section" style="margin-bottom:12px">
+            <div class="info-section" style="margin-bottom:12px; cursor:pointer" onclick="verDetalleGrupoDC('${g.id}')">
               <div class="info-row">
                 <span class="label">${g.nombre}</span>
                 <span style="color:var(--rojo-claro);font-size:12px">${g.dia_reunion || 'Sin día'} ${g.hora_reunion || ''}</span>
@@ -2597,8 +2634,8 @@ async function cargarDatosPastor() {
                 <span>${g.lider?.nombre || 'Sin asignar'}</span>
               </div>
               <div style="display:flex; gap:8px; margin-top:12px">
-                <button class="btn-secondary" style="margin-top:0; padding:10px" onclick="asignarLiderGrupo('${g.id}')">👥 Asignar líder</button>
-                <button class="btn-secondary" style="margin-top:0; padding:10px" onclick="asignarMiembrosGrupo('${g.id}', '${g.nombre}')">➕ Agregar miembros</button>
+                <button class="btn-secondary" style="margin-top:0; padding:10px" onclick="event.stopPropagation(); asignarLiderGrupo('${g.id}')">👥 Asignar líder</button>
+                <button class="btn-secondary" style="margin-top:0; padding:10px" onclick="event.stopPropagation(); verDetalleGrupoDC('${g.id}')">📄 Ver grupo</button>
               </div>
             </div>
           `).join('')
@@ -2606,6 +2643,101 @@ async function cargarDatosPastor() {
       </div>
     `;
     }
+
+    window.verDetalleGrupoDC = function (grupoId) {
+      state.pastorGrupoSeleccionadoId = grupoId;
+      cambiarPantalla('pastor-grupo-detalle');
+    };
+
+    function renderPastorGrupoDetalle() {
+      const grupoId = state.pastorGrupoSeleccionadoId;
+      const g = (state.gruposDC || []).find(x => x?.id === grupoId) || null;
+      if (!g) {
+        return `
+        <div class="main-content">
+          <div class="section-header">
+            <h3>🏠 Grupo DC</h3>
+            <button class="btn-back" onclick="cambiarPantalla('pastor-grupos')">← Volver</button>
+          </div>
+          <div class="coming-soon"><div class="big-icon">🏠</div><h3>Grupo no encontrado</h3></div>
+        </div>`;
+      }
+
+      const miembros = (state.congregantes || []).filter(c => c?.grupo_dc_id === g.id);
+      const disponibles = (state.congregantes || []).filter(c => !c?.grupo_dc_id);
+
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>🏠 ${sanitizar(g.nombre || 'Grupo')}</h3>
+          <button class="btn-back" onclick="cambiarPantalla('pastor-grupos')">← Volver</button>
+        </div>
+
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Detalle</h3>
+          <div class="info-row"><span class="label">Día</span><span>${sanitizar(g.dia_reunion || '—')}</span></div>
+          <div class="info-row"><span class="label">Hora</span><span>${sanitizar(g.hora_reunion || '—')}</span></div>
+          <div class="info-row"><span class="label">Líder</span><span>${sanitizar(g.lider?.nombre || 'Sin asignar')}</span></div>
+          <button class="btn-secondary" style="margin-top:12px" onclick="asignarLiderGrupo('${g.id}')">👥 Asignar/Cambiar líder</button>
+        </div>
+
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Integrantes <span style="font-size:12px;color:var(--texto-suave)">(${miembros.length})</span></h3>
+          ${miembros.length === 0 ?
+            `<div class="info-row"><span class="label">Sin integrantes</span></div>` :
+            miembros
+              .slice()
+              .sort((a, b) => String(a?.nombre || '').localeCompare(String(b?.nombre || '')))
+              .map(m => `<div class="info-row"><span class="label">${sanitizar(m.nombre || '—')}</span><span class="estado-${m.estado}">${estadoLabel(m.estado)}</span></div>`)
+              .join('')
+          }
+        </div>
+
+        <div class="info-section" style="margin-bottom:12px">
+          <h3>Agregar integrante</h3>
+          ${disponibles.length === 0 ?
+            `<div class="info-row"><span class="label">No hay congregantes disponibles (sin grupo)</span></div>` :
+            `
+            <div class="info-row">
+              <span class="label">Congregante</span>
+              <select style="width:240px" id="sel-add-miembro">
+                ${disponibles
+                  .slice()
+                  .sort((a, b) => String(a?.nombre || '').localeCompare(String(b?.nombre || '')))
+                  .map(c => `<option value="${c.id}">${sanitizar(c.nombre || '—')}</option>`)
+                  .join('')}
+              </select>
+            </div>
+            <button class="btn-secondary" style="margin-top:12px" onclick="pastorAgregarMiembroAGrupo('${g.id}')">➕ Agregar</button>
+            `
+          }
+        </div>
+      </div>`;
+    }
+
+    window.pastorAgregarMiembroAGrupo = async function (grupoId) {
+      try {
+        const sel = document.getElementById('sel-add-miembro');
+        const congreganteId = sel?.value;
+        if (!congreganteId) {
+          mostrarToast('⚠️ Seleccioná un congregante', 'error');
+          return;
+        }
+        const { error } = await withTimeout(
+          sb.from('congregantes').update({ grupo_dc_id: grupoId }).eq('id', congreganteId),
+          20000,
+          'agregar miembro grupo'
+        );
+        if (error) throw error;
+        mostrarToast('✅ Integrante agregado');
+        await cargarCongregantes();
+        await cargarDatosPastor();
+        render();
+      } catch (e) {
+        console.error('Error al agregar integrante:', e);
+        mostrarToast('⚠️ No se pudo agregar: ' + (e?.message || 'sin detalle'), 'error');
+      }
+    };
 
     window.mostrarModalCrearGrupo = function () {
       const nombre = prompt('Nombre del grupo DC:');
@@ -2662,22 +2794,7 @@ async function cargarDatosPastor() {
     };
 
     window.asignarMiembrosGrupo = async function (grupoId, grupoNombre) {
-      const miembrosDisponibles = state.congregantes.filter(c => !c.grupo_dc_id);
-      if (miembrosDisponibles.length === 0) {
-        mostrarToast('No hay miembros disponibles para asignar', 'error');
-        return;
-      }
-
-      const lista = miembrosDisponibles.map((m, i) => `${i + 1}. ${m.nombre} (${m.estado})`).join('\n');
-      const seleccion = prompt(`Asignar miembro a "${grupoNombre}":\n\n${lista}\n\nEscribí el número (0 para terminar):`);
-      const idx = parseInt(seleccion) - 1;
-      if (idx >= 0 && idx < miembrosDisponibles.length) {
-        await sb.from('congregantes').update({ grupo_dc_id: grupoId }).eq('id', miembrosDisponibles[idx].id);
-        mostrarToast(`✅ ${miembrosDisponibles[idx].nombre} asignado al grupo`);
-        await cargarCongregantes();
-        await cargarDatosPastor();
-        asignarMiembrosGrupo(grupoId, grupoNombre);
-      }
+      verDetalleGrupoDC(grupoId);
     };
 
     window.verDetalleLider = function (usuarioId) {
@@ -2812,17 +2929,90 @@ async function cargarDatosPastor() {
 
     window.verHistorialFichasPastorCongregante = async function (congreganteId, congreganteNombre) {
       try {
-        const { data, error } = await withTimeout(
-          sb.from('fichas_pastor_congregantes').select('*').eq('congregante_id', congreganteId).order('created_at', { ascending: false }).limit(5),
-          20000,
-          'cargar historial fichas pastor congregante'
-        );
-        if (error) throw error;
-        if (!data || data.length === 0) {
+        const [pastorRes, nangarekoRes, dcRes] = await Promise.all([
+          withTimeout(
+            sb.from('fichas_pastor_congregantes')
+              .select('created_at, tipo_contacto, pastor_id, es_por_ausencia')
+              .eq('congregante_id', congreganteId)
+              .order('created_at', { ascending: false })
+              .limit(20),
+            20000,
+            'historial pastor'
+          ),
+          withTimeout(
+            sb.from('fichas_nangareko')
+              .select('created_at, tipo_contacto, nangareko_id, es_por_ausencia')
+              .eq('congregante_id', congreganteId)
+              .order('created_at', { ascending: false })
+              .limit(20),
+            20000,
+            'historial nangareko'
+          ),
+          withTimeout(
+            sb.from('fichas_dc')
+              .select('created_at, tipo_contacto, lider_id, es_por_ausencia')
+              .eq('congregante_id', congreganteId)
+              .order('created_at', { ascending: false })
+              .limit(20),
+            20000,
+            'historial dc'
+          )
+        ]);
+
+        const fichas = [];
+
+        if (!pastorRes?.error) {
+          for (const f of (pastorRes.data || [])) {
+            fichas.push({
+              fuente: 'Pastor',
+              user_id: f.pastor_id,
+              created_at: f.created_at,
+              tipo_contacto: f.tipo_contacto,
+              es_por_ausencia: f.es_por_ausencia
+            });
+          }
+        }
+        if (!nangarekoRes?.error) {
+          for (const f of (nangarekoRes.data || [])) {
+            fichas.push({
+              fuente: 'Ñangareko',
+              user_id: f.nangareko_id,
+              created_at: f.created_at,
+              tipo_contacto: f.tipo_contacto,
+              es_por_ausencia: f.es_por_ausencia
+            });
+          }
+        }
+        if (!dcRes?.error) {
+          for (const f of (dcRes.data || [])) {
+            fichas.push({
+              fuente: 'Líder DC',
+              user_id: f.lider_id,
+              created_at: f.created_at,
+              tipo_contacto: f.tipo_contacto,
+              es_por_ausencia: f.es_por_ausencia
+            });
+          }
+        }
+
+        if (fichas.length === 0) {
           mostrarToast(`📭 ${congreganteNombre} - No hay contactos registrados aún`);
           return;
         }
-        const resumen = data.map(f => `📅 ${new Date(f.created_at).toLocaleDateString()}: ${f.tipo_contacto || 'contacto'}`).join('\n');
+
+        fichas.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+
+        const lideres = state.lideres || [];
+        const nombrePorId = (id) => (lideres.find(x => x?.id === id)?.nombre) || '';
+
+        const resumen = fichas.slice(0, 30).map(f => {
+          const fecha = f.created_at ? new Date(f.created_at).toLocaleDateString() : '';
+          const tipo = f.tipo_contacto || 'contacto';
+          const porAusencia = f.es_por_ausencia ? ' ⚠️' : '';
+          const quien = f.user_id ? ` (${nombrePorId(f.user_id) || f.fuente})` : '';
+          return `📅 ${fecha}: ${f.fuente}${quien} — ${tipo}${porAusencia}`;
+        }).join('\n');
+
         alert(`📜 Historial de ${congreganteNombre}:\n\n${resumen}`);
       } catch (e) {
         console.error('Error al cargar historial fichas pastor congregante:', e);
@@ -4141,11 +4331,31 @@ async function cargarDatosPastor() {
     }
 
     function renderAsistencia() {
-      const filtrados = state.congregantes.filter(c =>
-        c.nombre.toLowerCase().includes(state.busqueda.toLowerCase())
+      const busq = String(state.busqueda || '').toLowerCase();
+      const personas = [
+        ...(state.congregantes || []).map(c => ({
+          tipo: 'congregante',
+          id: c.id,
+          nombre: c.nombre,
+          foto_url: c.foto_url,
+          estado: c.estado
+        })),
+        ...(state.usuariosAsistencia || []).map(u => ({
+          tipo: 'usuario',
+          id: u.id,
+          nombre: u.nombre,
+          foto_url: u.foto_url,
+          rol: u.rol
+        }))
+      ];
+
+      const filtrados = personas.filter(p =>
+        String(p?.nombre || '').toLowerCase().includes(busq)
       );
       const presentes = Object.values(state.asistenciasHoy).filter(Boolean).length;
       const esHory = state.usuario?.rol === 'hory';
+
+      state.asistenciaTotalActual = personas.length;
 
       return `
       <div class="section-header">
@@ -4168,7 +4378,7 @@ async function cargarDatosPastor() {
 
       <div class="stats-row">
         <div class="stat-card">
-          <div class="stat-numero">${state.congregantes.length}</div>
+          <div class="stat-numero">${personas.length}</div>
           <div class="stat-label">Total</div>
         </div>
         <div class="stat-card">
@@ -4176,7 +4386,7 @@ async function cargarDatosPastor() {
           <div class="stat-label">Presentes</div>
         </div>
         <div class="stat-card">
-          <div class="stat-numero" style="color:var(--rojo-claro)">${state.congregantes.length - presentes}</div>
+          <div class="stat-numero" style="color:var(--rojo-claro)">${personas.length - presentes}</div>
           <div class="stat-label">Ausentes</div>
         </div>
       </div>
@@ -4187,24 +4397,24 @@ async function cargarDatosPastor() {
       <div id="lista-congregantes">
         ${filtrados.length === 0 ?
           `<div style="text-align:center;color:var(--texto-suave);padding:32px;font-size:14px">
-            ${state.congregantes.length === 0 ? 'No hay congregantes registrados aún.' : 'No se encontraron resultados.'}
+            ${personas.length === 0 ? 'No hay personas para listar aún.' : 'No se encontraron resultados.'}
           </div>` :
-          filtrados.map(c => {
-            const presente = state.asistenciasHoy[c.id] || false;
-            const iniciales = c.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          filtrados.map(p => {
+            const presente = state.asistenciasHoy[p.id] || false;
+            const iniciales = String(p.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
             return `
-              <div class="congregante-item ${presente ? 'presente' : ''}" id="item-${c.id}">
+              <div class="congregante-item ${presente ? 'presente' : ''}" id="item-${p.id}">
                 <div class="congregante-left">
                   <div class="congregante-foto">
-                    ${c.foto_url ? `<img src="${c.foto_url}" alt="${c.nombre}" />` : iniciales}
+                    ${p.foto_url ? `<img src="${p.foto_url}" alt="${sanitizar(p.nombre || '')}" />` : iniciales}
                   </div>
                   <div>
-                    <div class="congregante-nombre">${c.nombre}</div>
-                    ${esHory ? '' : `<div class="congregante-estado estado-${c.estado}">${estadoLabel(c.estado)}</div>`}
+                    <div class="congregante-nombre">${sanitizar(p.nombre || '')}${p.tipo === 'usuario' ? ' ⭐' : ''}</div>
+                    ${esHory ? '' : (p.tipo === 'congregante' ? `<div class="congregante-estado estado-${p.estado}">${estadoLabel(p.estado)}</div>` : '')}
                   </div>
                 </div>
                 <label class="switch">
-                  <input type="checkbox" ${presente ? 'checked' : ''} onchange="toggleAsistencia('${c.id}', this.checked)" />
+                  <input type="checkbox" ${presente ? 'checked' : ''} onchange="toggleAsistencia('${p.id}', this.checked)" />
                   <span class="slider"></span>
                 </label>
               </div>`;
@@ -4300,26 +4510,30 @@ async function cargarDatosPastor() {
 
       const esHory = state.usuario?.rol === 'hory';
 
-      const filtrados = state.congregantes.filter(c =>
-        c.nombre.toLowerCase().includes(valor.toLowerCase())
-      );
+      const busq = String(valor || '').toLowerCase();
+      const personas = [
+        ...(state.congregantes || []).map(c => ({ tipo: 'congregante', id: c.id, nombre: c.nombre, foto_url: c.foto_url, estado: c.estado })),
+        ...(state.usuariosAsistencia || []).map(u => ({ tipo: 'usuario', id: u.id, nombre: u.nombre, foto_url: u.foto_url, rol: u.rol }))
+      ];
+
+      const filtrados = personas.filter(p => String(p?.nombre || '').toLowerCase().includes(busq));
 
       lista.innerHTML = filtrados.length === 0 ?
         `<div style="text-align:center;color:var(--texto-suave);padding:32px;font-size:14px">No se encontraron resultados.</div>` :
-        filtrados.map(c => {
-          const presente = state.asistenciasHoy[c.id] || false;
-          const iniciales = c.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        filtrados.map(p => {
+          const presente = state.asistenciasHoy[p.id] || false;
+          const iniciales = String(p.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
           return `
-        <div class="congregante-item ${presente ? 'presente' : ''}" id="item-${c.id}">
+        <div class="congregante-item ${presente ? 'presente' : ''}" id="item-${p.id}">
           <div class="congregante-left">
-            <div class="congregante-foto">${c.foto_url ? `<img src="${c.foto_url}" />` : sanitizar(iniciales)}</div>
+            <div class="congregante-foto">${p.foto_url ? `<img src="${p.foto_url}" />` : sanitizar(iniciales)}</div>
             <div>
-              <div class="congregante-nombre">${sanitizar(c.nombre)}</div>
-              ${esHory ? '' : `<div class="congregante-estado estado-${c.estado}">${estadoLabel(c.estado)}</div>`}
+              <div class="congregante-nombre">${sanitizar(p.nombre || '')}${p.tipo === 'usuario' ? ' ⭐' : ''}</div>
+              ${esHory ? '' : (p.tipo === 'congregante' ? `<div class="congregante-estado estado-${p.estado}">${estadoLabel(p.estado)}</div>` : '')}
             </div>
           </div>
           <label class="switch">
-            <input type="checkbox" ${presente ? 'checked' : ''} onchange="toggleAsistencia('${c.id}', this.checked)" />
+            <input type="checkbox" ${presente ? 'checked' : ''} onchange="toggleAsistencia('${p.id}', this.checked)" />
             <span class="slider"></span>
           </label>
         </div>`;
@@ -4356,9 +4570,20 @@ async function cargarDatosPastor() {
         const presentesCard = statsCards[1]?.querySelector('.stat-numero');
         const ausentesCard = statsCards[2]?.querySelector('.stat-numero');
         if (presentesCard) presentesCard.textContent = presentes;
-        if (ausentesCard) ausentesCard.textContent = state.congregantes.length - presentes;
+        if (ausentesCard) ausentesCard.textContent = (state.asistenciaTotalActual || (state.congregantes || []).length) - presentes;
       }
     };
+
+    async function cargarUsuariosAsistencia() {
+      try {
+        const { data, error } = await sb.from('usuarios').select('id, nombre, foto_url, rol').order('nombre', { ascending: true });
+        if (error) throw error;
+        state.usuariosAsistencia = (data || []).filter(u => u?.id && u?.nombre);
+      } catch (e) {
+        console.error('Error al cargar usuarios para asistencia:', e);
+        state.usuariosAsistencia = [];
+      }
+    }
 
     /**
      * Saves all local attendance changes (from state.asistenciasHoy) to the database.
