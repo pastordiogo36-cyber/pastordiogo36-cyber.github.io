@@ -51,7 +51,7 @@
     }
 
     body.home-body {
-      background-image: linear-gradient(rgba(0, 0, 0, 0.68), rgba(0, 0, 0, 0.68)), url('fondo_inicio.jpg');
+      background-image: linear-gradient(rgba(0, 0, 0, 0.68), rgba(0, 0, 0, 0.68)), url('fondo_inicio.jpeg');
       background-size: cover;
       background-repeat: no-repeat;
       background-position: center top;
@@ -1430,18 +1430,21 @@
         if (pushId) patch.onesignal_push_id = pushId;
         if (Object.keys(patch).length === 0) return;
 
-        const ejemplo = state.usuario;
-        if (ejemplo && (typeof ejemplo.onesignal_id === 'undefined') && (typeof ejemplo.onesignal_push_id === 'undefined')) {
-          console.warn('Faltan columnas onesignal_id / onesignal_push_id en usuarios.');
-          return;
-        }
-
         const { error } = await withTimeout(
           sb.from('usuarios').update(patch).eq('id', state.session.user.id),
           12000,
           'guardar onesignal ids'
         );
-        if (error) throw error;
+        if (error) {
+          const msg = String(error?.message || '');
+          if (msg.toLowerCase().includes('column') && msg.toLowerCase().includes('does not exist')) {
+            console.warn('Faltan columnas onesignal_id / onesignal_push_id en usuarios.');
+            return;
+          }
+          throw error;
+        }
+
+        try { await cargarUsuario(); } catch (e) { /* noop */ }
         localStorage.setItem(key, nuevo);
       } catch (e) {
         console.error('No se pudieron guardar IDs de OneSignal en usuarios:', e);
