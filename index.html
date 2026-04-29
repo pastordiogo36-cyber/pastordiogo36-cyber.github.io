@@ -270,8 +270,8 @@
     }
 
     .user-avatar {
-      width: 30px;
-      height: 30px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.10);
@@ -283,6 +283,15 @@
       font-weight: 700;
       letter-spacing: 0.5px;
       user-select: none;
+      overflow: hidden;
+    }
+
+    .user-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
     }
 
     .rol-badge {
@@ -630,6 +639,8 @@
       border-radius: 50%;
       background: var(--gris-medio);
       border: 2px dashed rgba(255, 255, 255, 0.2);
+      position: relative;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -640,6 +651,14 @@
       transition: all 0.2s;
     }
 
+    .foto-upload > div {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .foto-upload:hover {
       border-color: var(--rojo);
     }
@@ -647,13 +666,21 @@
     .foto-upload span {
       font-size: 10px;
       color: var(--texto-suave);
-      margin-top: 4px;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 8px;
+      margin-top: 0;
+      text-align: center;
+      pointer-events: none;
     }
 
     .foto-upload img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      object-position: center;
+      display: block;
       border-radius: 50%;
     }
 
@@ -717,6 +744,28 @@
 
     .info-row .label {
       color: var(--texto-suave);
+    }
+
+    @media (max-width: 480px) {
+      .info-section {
+        padding: 16px;
+      }
+
+      .info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .info-row select,
+      .info-row input {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      .mobile-actions {
+        flex-direction: column !important;
+      }
     }
 
     /* ===== COMING SOON ===== */
@@ -1759,6 +1808,10 @@
         .map(p => p[0])
         .join('')
         .toUpperCase();
+
+      const avatarHtml = u?.foto_url
+        ? `<img src="${u.foto_url}" alt="foto" />`
+        : sanitizar(iniciales || '?');
       return `
       <div class="app-header">
         <div class="header-left">
@@ -1766,7 +1819,7 @@
           <div class="header-title">Pastoreo</div>
         </div>
         <div class="header-user">
-          <div class="user-avatar">${sanitizar(iniciales || '?')}</div>
+          <div class="user-avatar">${avatarHtml}</div>
           <span class="rol-badge rol-${u.rol}">${rolLabel}</span>
           <button class="btn-logout" id="btn-logout" onclick="logout()">Salir</button>
         </div>
@@ -2136,10 +2189,9 @@ async function cargarDatosPastor() {
               <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.06)">
                 <div class="info-row" style="align-items:center">
                   <div style="display:flex;align-items:center;gap:10px">
-                    <div class="congregante-foto" style="width:76px;height:76px">${u.foto_url ? `<img src="${sanitizar(u.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                    <div class="congregante-foto" style="width:62px;height:62px">${u.foto_url ? `<img src="${sanitizar(u.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
                     <div>
-                      <div class="label" style="cursor:pointer" onclick="verDetalleLider('${u.id}')">${sanitizar(u.nombre || '(Sin nombre)')}</div>
-                      <div style="font-size:12px;color:var(--texto-suave)">${sanitizar((roles.find(r => r.value === u.rol)?.label) || u.rol || '')}</div>
+                      <div class="label" style="cursor:pointer;font-weight:700;color:rgba(255,255,255,0.92)" onclick="verDetalleLider('${u.id}')">${sanitizar(u.nombre || '(Sin nombre)')}</div>
                     </div>
                   </div>
                   <select style="width:160px" onchange="actualizarRolUsuario('${u.id}', this.value)">
@@ -2166,10 +2218,9 @@ async function cargarDatosPastor() {
               <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.06)">
                 <div class="info-row" style="align-items:center">
                   <div style="display:flex;align-items:center;gap:10px">
-                    <div class="congregante-foto" style="width:76px;height:76px">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                    <div class="congregante-foto" style="width:62px;height:62px">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
                     <div>
-                      <div class="label">${sanitizar(c.nombre || '(Sin nombre)')}</div>
-                      <div style="font-size:12px;color:var(--texto-suave)">${sanitizar(rolLbl)}</div>
+                      <div class="label" style="font-weight:700;color:rgba(255,255,255,0.92)">${sanitizar(c.nombre || '(Sin nombre)')}</div>
                     </div>
                   </div>
                   <select style="width:160px" onchange="actualizarRolLiderazgoCongregante('${c.id}', this.value)">
@@ -2367,10 +2418,9 @@ async function cargarDatosPastor() {
               <div class="info-section" style="margin-bottom:12px">
                 <div class="info-row">
                   <div style="display:flex;align-items:center;gap:10px">
-                    <div class="congregante-foto" style="width:76px;height:76px">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
-                    <span class="label">${sanitizar(c.nombre)}</span>
+                    <div class="congregante-foto" style="width:62px;height:62px">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                    <span class="label" style="font-weight:700;color:rgba(255,255,255,0.92)">${sanitizar(c.nombre)}</span>
                   </div>
-                  <span class="estado-${c.estado}">${estadoLabel(c.estado)}</span>
                 </div>
 
                 <div class="info-row">
@@ -2393,7 +2443,7 @@ async function cargarDatosPastor() {
                   <span>${nangareko ? sanitizar(nangareko.nombre) : '—'}</span>
                 </div>
 
-                <div style="display:flex; gap:8px; margin-top:12px">
+                <div class="mobile-actions" style="display:flex; gap:8px; margin-top:12px">
                   <button class="btn-primary" style="flex:1; padding:10px" onclick="abrirFichaPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📝 Registrar contacto</button>
                   <button class="btn-primary" style="flex:1; padding:10px; background:var(--gris-medio)" onclick="verHistorialFichasPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📜 Historial</button>
                 </div>
