@@ -66,7 +66,7 @@
       align-items: center;
       justify-content: center;
       padding: 40px 24px;
-      background: radial-gradient(ellipse at 50% 20%, #3d0f0f 0%, var(--negro) 65%);
+      background: transparent;
     }
 
     .logo-placeholder {
@@ -1536,7 +1536,12 @@
     function render() {
       const app = document.getElementById('app');
       if (state.loading) { app.innerHTML = renderLoading(); return; }
-      if (!state.session) { app.innerHTML = renderLogin(); bindLogin(); return; }
+      if (!state.session) {
+        document.body.classList.add('home-body');
+        app.innerHTML = renderLogin();
+        bindLogin();
+        return;
+      }
       if (!state.usuario) { app.innerHTML = renderSetup(); bindSetup(); return; }
 
       if (!state.usuario?.foto_url) {
