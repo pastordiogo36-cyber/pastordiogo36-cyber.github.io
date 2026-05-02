@@ -977,6 +977,9 @@
       pastorFichaTarget: null,
       pastorFichasLider: [],
       pastorFichasCongregante: [],
+      pastorHistorialCongreganteTarget: null,
+      pastorHistorialCongregante: [],
+      pastorFichaHistorialSeleccionada: null,
       pastorLiderazgoDraft: { congreganteId: '', rol: '' },
       pastorUltimoNangarekoPorCongregante: {},
       pastorGrupoSeleccionadoId: null,
@@ -1990,6 +1993,8 @@
       if (state.pantalla === 'pastor-lider-fichas') return renderPastorLiderFichas();
       if (state.pantalla === 'pastor-congregacion') return renderPastorCongregacion();
       if (state.pantalla === 'pastor-congregante-fichas') return renderPastorCongreganteFichas();
+      if (state.pantalla === 'pastor-congregante-historial') return renderPastorCongreganteHistorial();
+      if (state.pantalla === 'pastor-congregante-ficha-detalle') return renderPastorCongreganteFichaDetalle();
       if (state.pantalla === 'pastor-calendario') return renderPastorCalendario();
       if (state.pantalla === 'pastor-alertas') return renderPastorAlertas();
       if (state.pantalla === 'pastor-grupos') return renderPastorGrupos();
@@ -2254,6 +2259,7 @@ async function cargarDatosPastor() {
 
       const rolesLiderazgo = [
         { value: '', label: '(Sin rol)' },
+        { value: 'lider', label: 'Líder' },
         { value: 'hory', label: 'Hory' },
         { value: 'nangareko', label: 'Ñangareko' },
         { value: 'lider_dc', label: 'Líder DC' }
@@ -2390,7 +2396,7 @@ async function cargarDatosPastor() {
           mostrarToast('⚠️ Seleccioná un congregante', 'error');
           return;
         }
-        if (!rol || !['hory', 'nangareko', 'lider_dc'].includes(rol)) {
+        if (!rol || !['lider', 'hory', 'nangareko', 'lider_dc'].includes(rol)) {
           mostrarToast('⚠️ Seleccioná un rol válido', 'error');
           return;
         }
@@ -2973,33 +2979,112 @@ async function cargarDatosPastor() {
       }
     };
 
+    function renderCampoFicha(label, valor) {
+      const v = String(valor || '').trim();
+      if (!v) return '';
+      return `<div class="info-row"><span class="label">${label}</span><span style="font-size:13px;white-space:pre-wrap;text-align:right">${sanitizar(v)}</span></div>`;
+    }
+
+    function renderPastorCongreganteHistorial() {
+      const target = state.pastorHistorialCongreganteTarget;
+      const fichas = state.pastorHistorialCongregante || [];
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>📜 Historial: ${sanitizar(target?.nombre || '')}</h3>
+          <button class="btn-back" onclick="cambiarPantalla('pastor-congregacion')">← Volver</button>
+        </div>
+
+        ${fichas.length === 0 ?
+          `<div class="coming-soon">
+            <div class="big-icon">📭</div>
+            <h3>No hay fichas</h3>
+            <p>Todavía no hay contactos registrados</p>
+          </div>` :
+          fichas.map((f, idx) => {
+            const fecha = f.created_at ? new Date(f.created_at).toLocaleDateString() : '';
+            const hora = f.created_at ? new Date(f.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            const porAusencia = f.es_por_ausencia ? ' ⚠️ Por ausencia' : '';
+            return `
+            <div class="info-section" style="margin-bottom:12px">
+              <div class="info-row">
+                <span class="label">${sanitizar(f.fuente || 'Ficha')}</span>
+                <span style="font-weight:700">${sanitizar(f.autor_nombre || f.fuente || '—')}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Fecha</span>
+                <span>${sanitizar(`${fecha}${hora ? ' ' + hora : ''}`)}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Contacto</span>
+                <span>${sanitizar(f.tipo_contacto || 'contacto')}${porAusencia}</span>
+              </div>
+              <button class="btn-secondary" style="margin-top:10px" onclick="verDetalleFichaHistorialPastor(${idx})">Ver ficha</button>
+            </div>`;
+          }).join('')
+        }
+      </div>`;
+    }
+
+    function renderPastorCongreganteFichaDetalle() {
+      const f = state.pastorFichaHistorialSeleccionada;
+      if (!f) {
+        return `<div class="main-content"><div class="section-header"><h3>📋 Ficha</h3><button class="btn-back" onclick="cambiarPantalla('pastor-congregante-historial')">← Volver</button></div></div>`;
+      }
+      const fecha = f.created_at ? new Date(f.created_at).toLocaleString() : '';
+      return `
+      <div class="main-content">
+        <div class="section-header">
+          <h3>📋 Ficha de ${sanitizar(f.fuente || '')}</h3>
+          <button class="btn-back" onclick="cambiarPantalla('pastor-congregante-historial')">← Volver</button>
+        </div>
+        <div class="info-section">
+          ${renderCampoFicha('Registró', f.autor_nombre || f.fuente)}
+          ${renderCampoFicha('Fecha', fecha)}
+          ${renderCampoFicha('Tipo', f.tipo_contacto)}
+          ${renderCampoFicha('Por ausencia', f.es_por_ausencia ? 'Sí' : '')}
+          ${renderCampoFicha('Versículo', f.versiculo_compartido)}
+          ${renderCampoFicha('Estado de ánimo', f.estado_animo)}
+          ${renderCampoFicha('Motivo oración', f.motivo_oracion)}
+          ${renderCampoFicha('Vida espiritual', f.vida_espiritual)}
+          ${renderCampoFicha('Áreas de mejora', f.areas_mejora)}
+          ${renderCampoFicha('Notas', f.notas_adicionales)}
+        </div>
+      </div>`;
+    }
+
+    window.verDetalleFichaHistorialPastor = function (idx) {
+      state.pastorFichaHistorialSeleccionada = (state.pastorHistorialCongregante || [])[idx] || null;
+      cambiarPantalla('pastor-congregante-ficha-detalle');
+    };
+
     window.verHistorialFichasPastorCongregante = async function (congreganteId, congreganteNombre) {
       try {
         const [pastorRes, nangarekoRes, dcRes] = await Promise.all([
           withTimeout(
             sb.from('fichas_pastor_congregantes')
-              .select('created_at, tipo_contacto, pastor_id, es_por_ausencia')
+              .select('*')
               .eq('congregante_id', congreganteId)
               .order('created_at', { ascending: false })
-              .limit(20),
+              .limit(50),
             20000,
             'historial pastor'
           ),
           withTimeout(
             sb.from('fichas_nangareko')
-              .select('created_at, tipo_contacto, nangareko_id, es_por_ausencia')
+              .select('*')
               .eq('congregante_id', congreganteId)
               .order('created_at', { ascending: false })
-              .limit(20),
+              .limit(50),
             20000,
             'historial nangareko'
           ),
           withTimeout(
             sb.from('fichas_dc')
-              .select('created_at, tipo_contacto, lider_id, es_por_ausencia')
+              .select('*')
               .eq('congregante_id', congreganteId)
               .order('created_at', { ascending: false })
-              .limit(20),
+              .limit(50),
             20000,
             'historial dc'
           )
@@ -3010,56 +3095,42 @@ async function cargarDatosPastor() {
         if (!pastorRes?.error) {
           for (const f of (pastorRes.data || [])) {
             fichas.push({
+              ...f,
               fuente: 'Pastor',
-              user_id: f.pastor_id,
-              created_at: f.created_at,
-              tipo_contacto: f.tipo_contacto,
-              es_por_ausencia: f.es_por_ausencia
+              user_id: f.pastor_id
             });
           }
         }
         if (!nangarekoRes?.error) {
           for (const f of (nangarekoRes.data || [])) {
             fichas.push({
+              ...f,
               fuente: 'Ñangareko',
-              user_id: f.nangareko_id,
-              created_at: f.created_at,
-              tipo_contacto: f.tipo_contacto,
-              es_por_ausencia: f.es_por_ausencia
+              user_id: f.nangareko_id
             });
           }
         }
         if (!dcRes?.error) {
           for (const f of (dcRes.data || [])) {
             fichas.push({
+              ...f,
               fuente: 'Líder DC',
-              user_id: f.lider_id,
-              created_at: f.created_at,
-              tipo_contacto: f.tipo_contacto,
-              es_por_ausencia: f.es_por_ausencia
+              user_id: f.lider_id
             });
           }
-        }
-
-        if (fichas.length === 0) {
-          mostrarToast(`📭 ${congreganteNombre} - No hay contactos registrados aún`);
-          return;
         }
 
         fichas.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
 
         const lideres = state.lideres || [];
         const nombrePorId = (id) => (lideres.find(x => x?.id === id)?.nombre) || '';
-
-        const resumen = fichas.slice(0, 30).map(f => {
-          const fecha = f.created_at ? new Date(f.created_at).toLocaleDateString() : '';
-          const tipo = f.tipo_contacto || 'contacto';
-          const porAusencia = f.es_por_ausencia ? ' ⚠️' : '';
-          const quien = f.user_id ? ` (${nombrePorId(f.user_id) || f.fuente})` : '';
-          return `📅 ${fecha}: ${f.fuente}${quien} — ${tipo}${porAusencia}`;
-        }).join('\n');
-
-        alert(`📜 Historial de ${congreganteNombre}:\n\n${resumen}`);
+        state.pastorHistorialCongreganteTarget = { id: congreganteId, nombre: congreganteNombre };
+        state.pastorHistorialCongregante = fichas.map(f => ({
+          ...f,
+          autor_nombre: f.user_id ? (nombrePorId(f.user_id) || f.fuente) : f.fuente
+        }));
+        state.pastorFichaHistorialSeleccionada = null;
+        cambiarPantalla('pastor-congregante-historial');
       } catch (e) {
         console.error('Error al cargar historial fichas pastor congregante:', e);
         mostrarToast('⚠️ No se pudo cargar el historial: ' + (e?.message || 'sin detalle'), 'error');
