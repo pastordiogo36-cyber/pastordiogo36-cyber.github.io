@@ -2344,14 +2344,14 @@ async function cargarDatosPastor() {
           <h3 style="margin:0 0 12px 0">➕ Marcar líder (sin app)</h3>
           <div class="info-row">
             <span class="label">Congregante</span>
-            <select style="width:200px" onchange="setPastorLiderazgoDraftCongregante(this.value)">
+            <select id="pastor-liderazgo-congregante" style="width:200px" onchange="setPastorLiderazgoDraftCongregante(this.value)">
               <option value="" ${!draft.congreganteId ? 'selected' : ''}>(Seleccionar)</option>
               ${listaCong.map(c => `<option value="${c.id}" ${draft.congreganteId === c.id ? 'selected' : ''}>${sanitizar(c.nombre || '(Sin nombre)')}</option>`).join('')}
             </select>
           </div>
           <div class="info-row">
             <span class="label">Rol</span>
-            <select style="width:200px" onchange="setPastorLiderazgoDraftRol(this.value)">
+            <select id="pastor-liderazgo-rol" style="width:200px" onchange="setPastorLiderazgoDraftRol(this.value)">
               ${rolesLiderazgo.filter(r => r.value !== '').map(r => `<option value="${r.value}" ${draft.rol === r.value ? 'selected' : ''}>${r.label}</option>`).join('')}
             </select>
           </div>
@@ -2390,8 +2390,8 @@ async function cargarDatosPastor() {
 
     window.guardarPastorLiderazgoDraft = async function () {
       try {
-        const congreganteId = String(state.pastorLiderazgoDraft?.congreganteId || '');
-        const rol = String(state.pastorLiderazgoDraft?.rol || '');
+        const congreganteId = String(document.getElementById('pastor-liderazgo-congregante')?.value || state.pastorLiderazgoDraft?.congreganteId || '');
+        const rol = String(document.getElementById('pastor-liderazgo-rol')?.value || state.pastorLiderazgoDraft?.rol || '');
         if (!congreganteId) {
           mostrarToast('⚠️ Seleccioná un congregante', 'error');
           return;
@@ -4452,14 +4452,16 @@ async function cargarDatosPastor() {
       const personas = [
         ...(state.congregantes || []).map(c => ({
           tipo: 'congregante',
-          id: c.id,
+          id: `congregante:${c.id}`,
+          persona_id: c.id,
           nombre: c.nombre,
           foto_url: c.foto_url,
           estado: c.estado
         })),
         ...(state.usuariosAsistencia || []).map(u => ({
           tipo: 'usuario',
-          id: u.id,
+          id: `usuario:${u.id}`,
+          persona_id: u.id,
           nombre: u.nombre,
           foto_url: u.foto_url,
           rol: u.rol
@@ -4629,8 +4631,8 @@ async function cargarDatosPastor() {
 
       const busq = String(valor || '').toLowerCase();
       const personas = [
-        ...(state.congregantes || []).map(c => ({ tipo: 'congregante', id: c.id, nombre: c.nombre, foto_url: c.foto_url, estado: c.estado })),
-        ...(state.usuariosAsistencia || []).map(u => ({ tipo: 'usuario', id: u.id, nombre: u.nombre, foto_url: u.foto_url, rol: u.rol }))
+        ...(state.congregantes || []).map(c => ({ tipo: 'congregante', id: `congregante:${c.id}`, persona_id: c.id, nombre: c.nombre, foto_url: c.foto_url, estado: c.estado })),
+        ...(state.usuariosAsistencia || []).map(u => ({ tipo: 'usuario', id: `usuario:${u.id}`, persona_id: u.id, nombre: u.nombre, foto_url: u.foto_url, rol: u.rol }))
       ];
 
       const filtrados = personas.filter(p => String(p?.nombre || '').toLowerCase().includes(busq));
@@ -4709,32 +4711,51 @@ async function cargarDatosPastor() {
     window.guardarAsistencias = async function () {
       try {
         const hoy = new Date().toISOString().split('T')[0];
-        const asistenciasAPendientes = [];
+        const asistenciasCongregantes = [];
+        const asistenciasUsuarios = [];
 
-        for (const [congreganteId, presente] of Object.entries(state.asistenciasHoy)) {
-          asistenciasAPendientes.push({
-            congregante_id: congreganteId,
+        for (const [personaKey, presente] of Object.entries(state.asistenciasHoy)) {
+          const [tipoPersona, personaId] = String(personaKey || '').split(':');
+          if (!personaId) continue;
+          const row = {
             tipo_servicio: state.servicioActivo,
             fecha: hoy,
             presente: presente,
             registrado_por: state.usuario.id
-          });
+          };
+          if (tipoPersona === 'usuario') {
+            row.usuario_id = personaId;
+            row.congregante_id = null;
+            asistenciasUsuarios.push(row);
+          } else {
+            row.congregante_id = personaId;
+            row.usuario_id = null;
+            asistenciasCongregantes.push(row);
+          }
         }
 
-        if (asistenciasAPendientes.length === 0) return;
+        if (asistenciasCongregantes.length === 0 && asistenciasUsuarios.length === 0) return;
 
-        const { error } = await withTimeout(
-          sb.from('asistencias').upsert(asistenciasAPendientes, {
-            onConflict: 'congregante_id,tipo_servicio,fecha'
-          }),
-          12000,
-          'guardar asistencias'
-        );
+        if (asistenciasCongregantes.length > 0) {
+          const { error } = await withTimeout(
+            sb.from('asistencias').upsert(asistenciasCongregantes, {
+              onConflict: 'congregante_id,tipo_servicio,fecha'
+            }),
+            12000,
+            'guardar asistencias congregantes'
+          );
+          if (error) throw error;
+        }
 
-        if (error) {
-          console.error('Error al guardar asistencias:', error);
-          mostrarToast('⚠️ No se pudieron guardar las asistencias', 'error');
-          return;
+        if (asistenciasUsuarios.length > 0) {
+          const { error } = await withTimeout(
+            sb.from('asistencias').upsert(asistenciasUsuarios, {
+              onConflict: 'usuario_id,tipo_servicio,fecha'
+            }),
+            12000,
+            'guardar asistencias usuarios'
+          );
+          if (error) throw error;
         }
 
         if (!state.asistenciasPorServicio) state.asistenciasPorServicio = { domingo: {}, miercoles: {} };
@@ -4895,7 +4916,7 @@ async function cargarDatosPastor() {
     async function cargarAsistenciasHoy() {
       const hoy = new Date().toISOString().split('T')[0];
       const { data, error } = await sb.from('asistencias')
-        .select('congregante_id, presente')
+        .select('congregante_id, usuario_id, presente')
         .eq('tipo_servicio', state.servicioActivo)
         .eq('fecha', hoy);
       if (error) {
@@ -4903,7 +4924,13 @@ async function cargarDatosPastor() {
         mostrarToast('⚠️ No se pudieron cargar asistencias (ver permisos/RLS)', 'error');
       }
       state.asistenciasHoy = {};
-      (data || []).forEach(a => { state.asistenciasHoy[a.congregante_id] = a.presente; });
+      (data || []).forEach(a => {
+        if (a.usuario_id) {
+          state.asistenciasHoy[`usuario:${a.usuario_id}`] = a.presente;
+        } else if (a.congregante_id) {
+          state.asistenciasHoy[`congregante:${a.congregante_id}`] = a.presente;
+        }
+      });
       if (!state.asistenciasPorServicio) state.asistenciasPorServicio = { domingo: {}, miercoles: {} };
       state.asistenciasPorServicio[state.servicioActivo] = { ...state.asistenciasHoy };
     }
