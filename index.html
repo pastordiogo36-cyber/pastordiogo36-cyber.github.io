@@ -4704,6 +4704,37 @@ async function cargarDatosPastor() {
       }
     }
 
+    async function guardarAsistenciaIndividual(row) {
+      const query = sb.from('asistencias')
+        .select('id')
+        .eq('tipo_servicio', row.tipo_servicio)
+        .eq('fecha', row.fecha)
+        .limit(1);
+
+      if (row.usuario_id) {
+        query.eq('usuario_id', row.usuario_id);
+      } else {
+        query.eq('congregante_id', row.congregante_id);
+      }
+
+      const { data: existente, error: selectError } = await query;
+      if (selectError) throw selectError;
+
+      if (existente && existente.length > 0) {
+        const { error } = await sb.from('asistencias')
+          .update({
+            presente: row.presente,
+            registrado_por: row.registrado_por
+          })
+          .eq('id', existente[0].id);
+        if (error) throw error;
+        return;
+      }
+
+      const { error } = await sb.from('asistencias').insert(row);
+      if (error) throw error;
+    }
+
     /**
      * Saves all local attendance changes (from state.asistenciasHoy) to the database.
      * This is called when exiting the attendance screen.
@@ -4736,27 +4767,11 @@ async function cargarDatosPastor() {
 
         if (asistenciasCongregantes.length === 0 && asistenciasUsuarios.length === 0) return;
 
-        if (asistenciasCongregantes.length > 0) {
-          const { error } = await withTimeout(
-            sb.from('asistencias').upsert(asistenciasCongregantes, {
-              onConflict: 'congregante_id,tipo_servicio,fecha'
-            }),
-            12000,
-            'guardar asistencias congregantes'
-          );
-          if (error) throw error;
-        }
-
-        if (asistenciasUsuarios.length > 0) {
-          const { error } = await withTimeout(
-            sb.from('asistencias').upsert(asistenciasUsuarios, {
-              onConflict: 'usuario_id,tipo_servicio,fecha'
-            }),
-            12000,
-            'guardar asistencias usuarios'
-          );
-          if (error) throw error;
-        }
+        await withTimeout(
+          Promise.all([...asistenciasCongregantes, ...asistenciasUsuarios].map(row => guardarAsistenciaIndividual(row))),
+          20000,
+          'guardar asistencias'
+        );
 
         if (!state.asistenciasPorServicio) state.asistenciasPorServicio = { domingo: {}, miercoles: {} };
         state.asistenciasPorServicio[state.servicioActivo] = { ...state.asistenciasHoy };
