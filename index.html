@@ -1019,7 +1019,8 @@
     async function calcularAvisosNangareko(cuidados) {
       const hoy = new Date();
       const hoyYmd = hoy.toISOString().split('T')[0];
-      const ids = (cuidados || []).map(c => c.id).filter(Boolean);
+      const cuidadosActivos = (cuidados || []).filter(c => c?.estado !== 'excepcion');
+      const ids = cuidadosActivos.map(c => c.id).filter(Boolean);
       if (ids.length === 0) return [];
 
       const { data: asistData, error: asistError } = await sb
@@ -1090,7 +1091,7 @@
 
       const avisos = [];
 
-      for (const c of (cuidados || [])) {
+      for (const c of cuidadosActivos) {
         const nombre = c?.nombre || 'Sin nombre';
         const primera = primeraAsistenciaPorId.get(c.id);
         if (!primera?.fecha) continue;
@@ -1455,7 +1456,7 @@
     }
 
     function estadoLabel(estado) {
-      const labels = { nuevo: '✨ Nuevo', en_proceso: '🔵 En proceso', en_anua: '📚 En Añua', bautizado: '💧 Bautizado', en_dc: '🏠 En DC', graduado: '🎓 Graduado', visita: '👋 Visita' };
+      const labels = { nuevo: '✨ Nuevo', en_proceso: '🔵 En proceso', en_anua: '📚 En Añua', bautizado: '💧 Bautizado', en_dc: '🏠 En DC', graduado: '🎓 Graduado', visita: '👋 Visita', excepcion: '🛡️ Excepción' };
       return labels[estado] || estado;
     }
 
@@ -2485,7 +2486,8 @@ async function cargarDatosPastor() {
         { value: 'en_anua', label: estadoLabel('en_anua') },
         { value: 'bautizado', label: estadoLabel('bautizado') },
         { value: 'en_dc', label: estadoLabel('en_dc') },
-        { value: 'graduado', label: estadoLabel('graduado') }
+        { value: 'graduado', label: estadoLabel('graduado') },
+        { value: 'excepcion', label: estadoLabel('excepcion') }
       ];
 
       const busq = (state.pastorCongregacionBusqueda || '').toLowerCase();
@@ -2716,7 +2718,7 @@ async function cargarDatosPastor() {
       }
 
       const miembros = (state.congregantes || []).filter(c => c?.grupo_dc_id === g.id);
-      const disponibles = (state.congregantes || []).filter(c => !c?.grupo_dc_id);
+      const disponibles = (state.congregantes || []).filter(c => !c?.grupo_dc_id && c?.estado !== 'excepcion');
 
       return `
       <div class="main-content">
@@ -2773,6 +2775,11 @@ async function cargarDatosPastor() {
         const congreganteId = sel?.value;
         if (!congreganteId) {
           mostrarToast('⚠️ Seleccioná un congregante', 'error');
+          return;
+        }
+        const c = (state.congregantes || []).find(x => x?.id === congreganteId);
+        if (c?.estado === 'excepcion') {
+          mostrarToast('⚠️ Una persona en excepción no se asigna a DC. Cambiá primero su estado si corresponde.', 'error');
           return;
         }
         const { error } = await withTimeout(
@@ -3159,7 +3166,7 @@ async function cargarDatosPastor() {
 
     window.actualizarEstadoCongregante = async function (congreganteId, nuevoEstado) {
       try {
-        if (nuevoEstado === 'graduado') {
+        if (nuevoEstado === 'graduado' || nuevoEstado === 'excepcion') {
           const c = (state.misCuidados || []).find(x => x?.id === congreganteId)
             || (state.congregantes || []).find(x => x?.id === congreganteId)
             || (state.miembrosGrupo || []).find(x => x?.id === congreganteId)
@@ -3174,8 +3181,12 @@ async function cargarDatosPastor() {
           const bautismoOk = Boolean(c?.ya_bautizado);
           const dcOk = Boolean(c?.grupo_dc_id);
 
-          if (!anuaOk || !bautismoOk || !dcOk) {
+          if (nuevoEstado === 'graduado' && (!anuaOk || !bautismoOk || !dcOk)) {
             mostrarToast('⚠️ Para graduar debe completar: Añua + Bautismo + estar en un DC.', 'error');
+            return;
+          }
+          if (nuevoEstado === 'excepcion' && (!anuaOk || !bautismoOk)) {
+            mostrarToast('⚠️ Para marcar excepción debe completar: Añua + Bautismo.', 'error');
             return;
           }
         }
@@ -3189,6 +3200,10 @@ async function cargarDatosPastor() {
         }
         if (nuevoEstado === 'graduado') {
           patch.nangareko_id = null;
+        }
+        if (nuevoEstado === 'excepcion') {
+          patch.nangareko_id = null;
+          patch.grupo_dc_id = null;
         }
 
         let res;
