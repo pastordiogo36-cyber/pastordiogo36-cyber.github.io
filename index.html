@@ -1910,9 +1910,14 @@
             btnGuardar.disabled = true; btnGuardar.textContent = 'Guardando...';
             err.style.display = 'none';
 
-            const { data: nuevo, error } = await sb.from('congregantes').insert({
-              nombre, telefono: telefono || null, estado: 'nuevo'
-            }).select().single();
+            const nuevoCongregante = {
+              nombre,
+              telefono: telefono || null,
+              estado: 'nuevo'
+            };
+            if (state.fotoNuevo) nuevoCongregante.foto_url = state.fotoNuevo;
+
+            const { data: nuevo, error } = await sb.from('congregantes').insert(nuevoCongregante).select().single();
 
             if (error) {
               err.style.display = 'block'; err.textContent = 'Error al guardar: ' + error.message;
