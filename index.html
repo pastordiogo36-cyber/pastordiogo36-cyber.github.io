@@ -983,6 +983,7 @@
       pastorLiderazgoDraft: { congreganteId: '', rol: '' },
       pastorUltimoNangarekoPorCongregante: {},
       pastorGrupoSeleccionadoId: null,
+      pastorCongreganteExpandidoId: null,
       // Ñangareko
       misCuidados: [],
       alertasNuevos: [],
@@ -2520,25 +2521,31 @@ async function cargarDatosPastor() {
             const nangarekoId = c.nangareko_id || state.pastorUltimoNangarekoPorCongregante?.[c.id] || null;
             const nangareko = nangarekoId ? nangarekos.find(n => n.id === nangarekoId) : null;
             const iniciales = (c.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            const expandido = state.pastorCongreganteExpandidoId === c.id;
             return `
-              <div class="info-section" style="margin-bottom:12px">
-                <div class="info-row">
+              <div class="info-section" style="margin-bottom:12px;cursor:pointer" onclick="togglePastorCongreganteDetalle('${c.id}')">
+                <div class="info-row" style="align-items:center">
                   <div style="display:flex;align-items:center;gap:10px">
-                    <div class="congregante-foto" style="width:62px;height:62px">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
-                    <span class="label" style="font-weight:700;color:rgba(255,255,255,0.92)">${sanitizar(c.nombre)}</span>
+                    <div class="congregante-foto" style="width:62px;height:62px;cursor:zoom-in" onclick="event.stopPropagation(); abrirFotoCongregante('${c.id}')">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                    <div>
+                      <div class="label" style="font-weight:700;color:rgba(255,255,255,0.92)">${sanitizar(c.nombre)}</div>
+                      <div class="congregante-estado estado-${c.estado}" style="font-size:12px;margin-top:4px">${estadoLabel(c.estado)}</div>
+                    </div>
                   </div>
+                  <span style="color:var(--texto-suave);font-size:18px">${expandido ? '⌃' : '⌄'}</span>
                 </div>
 
+                ${expandido ? `
                 <div class="info-row">
                   <span class="label">Estado</span>
-                  <select style="width:200px" onchange="actualizarEstadoCongregante('${c.id}', this.value)">
+                  <select style="width:200px" onclick="event.stopPropagation()" onchange="actualizarEstadoCongregante('${c.id}', this.value)">
                     ${estadoOpciones.map(o => `<option value="${o.value}" ${c.estado === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
                   </select>
                 </div>
 
                 <div class="info-row">
                   <span class="label">Grupo DC</span>
-                  <select style="width:200px" onchange="actualizarGrupoDCCongregante('${c.id}', this.value)">
+                  <select style="width:200px" onclick="event.stopPropagation()" onchange="actualizarGrupoDCCongregante('${c.id}', this.value)">
                     <option value="">(Sin grupo)</option>
                     ${grupos.map(g => `<option value="${g.id}" ${c.grupo_dc_id === g.id ? 'selected' : ''}>${sanitizar(g.nombre)}</option>`).join('')}
                   </select>
@@ -2550,9 +2557,10 @@ async function cargarDatosPastor() {
                 </div>
 
                 <div class="mobile-actions" style="display:flex; gap:8px; margin-top:12px">
-                  <button class="btn-primary" style="flex:1; padding:10px" onclick="abrirFichaPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📝 Registrar contacto</button>
-                  <button class="btn-primary" style="flex:1; padding:10px; background:var(--gris-medio)" onclick="verHistorialFichasPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📜 Historial</button>
+                  <button class="btn-primary" style="flex:1; padding:10px" onclick="event.stopPropagation(); abrirFichaPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📝 Registrar contacto</button>
+                  <button class="btn-primary" style="flex:1; padding:10px; background:var(--gris-medio)" onclick="event.stopPropagation(); verHistorialFichasPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📜 Historial</button>
                 </div>
+                ` : ''}
               </div>`;
           }).join('')
         }
@@ -3152,6 +3160,30 @@ async function cargarDatosPastor() {
     window.actualizarBusquedaCongregacion = function (valor) {
       state.pastorCongregacionBusqueda = valor;
       render();
+    };
+
+    window.togglePastorCongreganteDetalle = function (congreganteId) {
+      state.pastorCongreganteExpandidoId = state.pastorCongreganteExpandidoId === congreganteId ? null : congreganteId;
+      render();
+    };
+
+    window.abrirFotoCongregante = function (congreganteId) {
+      const c = (state.congregantes || []).find(x => x?.id === congreganteId);
+      if (!c?.foto_url) {
+        mostrarToast('ℹ️ Este miembro no tiene foto cargada', 'error');
+        return;
+      }
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.style.display = 'flex';
+      modal.onclick = () => modal.remove();
+      modal.innerHTML = `
+        <div class="modal-content" style="width:auto;max-width:92vw;padding:12px;text-align:center" onclick="event.stopPropagation()">
+          <img src="${sanitizar(c.foto_url)}" alt="${sanitizar(c.nombre || '')}" style="display:block;max-width:86vw;max-height:72vh;border-radius:16px;object-fit:contain;margin:0 auto 12px auto" />
+          <div style="font-weight:700;margin-bottom:12px">${sanitizar(c.nombre || '')}</div>
+          <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cerrar</button>
+        </div>`;
+      document.body.appendChild(modal);
     };
 
     function actualizarCongreganteEnColecciones(congreganteId, patch) {
