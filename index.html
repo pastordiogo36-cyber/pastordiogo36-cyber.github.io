@@ -2544,6 +2544,11 @@ async function cargarDatosPastor() {
                 </div>
 
                 <div class="info-row">
+                  <span class="label">Teléfono</span>
+                  <span>${c.telefono ? sanitizar(c.telefono) : '—'}</span>
+                </div>
+
+                <div class="info-row">
                   <span class="label">Grupo DC</span>
                   <select style="width:200px" onclick="event.stopPropagation()" onchange="actualizarGrupoDCCongregante('${c.id}', this.value)">
                     <option value="">(Sin grupo)</option>
