@@ -958,7 +958,7 @@
       session: null,
       usuario: null,
       pantalla: 'home',
-      servicioActivo: 'domingo',
+      servicioActivo: localStorage.getItem('servicioActivo') || 'domingo',
       congregantes: [],
       asistenciasHoy: {},
       asistenciasPorServicio: { domingo: {}, miercoles: {} },
@@ -2523,10 +2523,10 @@ async function cargarDatosPastor() {
             const iniciales = (c.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
             const expandido = state.pastorCongreganteExpandidoId === c.id;
             return `
-              <div class="info-section" style="margin-bottom:12px;cursor:pointer" onclick="togglePastorCongreganteDetalle('${c.id}')">
+              <div class="info-section" style="margin-bottom:8px;padding:12px;cursor:pointer" onclick="togglePastorCongreganteDetalle('${c.id}')">
                 <div class="info-row" style="align-items:center">
-                  <div style="display:flex;align-items:center;gap:10px">
-                    <div class="congregante-foto" style="width:62px;height:62px;cursor:zoom-in" onclick="event.stopPropagation(); abrirFotoCongregante('${c.id}')">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div class="congregante-foto" style="width:44px;height:44px;cursor:zoom-in;flex-shrink:0" onclick="event.stopPropagation(); abrirFotoCongregante('${c.id}')">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
                     <div>
                       <div class="label" style="font-weight:700;color:rgba(255,255,255,0.92)">${sanitizar(c.nombre)}</div>
                       <div class="congregante-estado estado-${c.estado}" style="font-size:12px;margin-top:4px">${estadoLabel(c.estado)}</div>
@@ -3186,9 +3186,33 @@ async function cargarDatosPastor() {
         <div class="modal-content" style="width:auto;max-width:92vw;padding:12px;text-align:center" onclick="event.stopPropagation()">
           <img src="${sanitizar(c.foto_url)}" alt="${sanitizar(c.nombre || '')}" style="display:block;max-width:86vw;max-height:72vh;border-radius:16px;object-fit:contain;margin:0 auto 12px auto" />
           <div style="font-weight:700;margin-bottom:12px">${sanitizar(c.nombre || '')}</div>
+          <input type="file" class="modal-foto-input" accept="image/*" style="display:none" onchange="procesarYGuardarFotoCongregante('${c.id}', this)" />
+          <button class="btn-primary" style="margin-bottom:8px" onclick="this.parentElement.querySelector('.modal-foto-input').click()">📷 Cambiar foto</button>
+          <br/>
           <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cerrar</button>
         </div>`;
       document.body.appendChild(modal);
+    };
+
+    window.procesarYGuardarFotoCongregante = async function (congreganteId, input) {
+      if (!input.files || !input.files[0]) return;
+      try {
+        const dataUrl = await procesarImagenArchivo(input.files[0]);
+        const { error } = await withTimeout(
+          sb.from('congregantes').update({ foto_url: dataUrl }).eq('id', congreganteId),
+          20000,
+          'actualizar foto congregante'
+        );
+        if (error) throw error;
+        actualizarCongreganteEnColecciones(congreganteId, { foto_url: dataUrl });
+        mostrarToast('✅ Foto actualizada');
+        render();
+        const modal = document.querySelector('.modal');
+        if (modal) modal.remove();
+      } catch (e) {
+        console.error('Error al cambiar foto:', e);
+        mostrarToast('⚠️ No se pudo actualizar la foto', 'error');
+      }
     };
 
     function actualizarCongreganteEnColecciones(congreganteId, patch) {
@@ -4647,6 +4671,7 @@ async function cargarDatosPastor() {
         await withTimeout(guardarAsistencias(), 20000, 'guardar asistencias');
 
         state.servicioActivo = servicio;
+        try { localStorage.setItem('servicioActivo', servicio); } catch (e) { /* noop */ }
 
         // Si ya tenemos cache local del servicio, úsalo; si no, carga desde DB
         const cache = state.asistenciasPorServicio?.[servicio];
