@@ -1487,12 +1487,7 @@
       const alertasNuevosChannel = sb.channel('alertas-nuevos')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'congregantes' }, async (payload) => {
           const nuevoCongregante = payload.new;
-
-          // 1. Verificar si el nuevo congregante es un "Nuevo" (estado 'nuevo')
-          //    y si no tiene un ñangareko asignado aún (la alerta no se disparó antes)
           if (nuevoCongregante.estado === 'nuevo' && !nuevoCongregante.nangareko_id) {
-
-            // 2. Si el usuario actual es un Ñangareko, actualiza su lista de alertas
             if (state.usuario?.rol === 'nangareko') {
               await cargarDatosNangareko();
               mostrarToast(`🚨 ¡Nuevo ingreso! ${nuevoCongregante.nombre}`);
@@ -1502,8 +1497,7 @@
         })
         .subscribe();
 
-      // Suscripción general para mantener listas actualizadas (Hory / Pastor / Ñangareko / Líder DC)
-      // Nota: esto depende de Realtime habilitado en Supabase para la tabla y de que RLS permita ver filas.
+      // Suscripción general suavizada: solo avisa, no recarga automáticamente para no congelar la UI
       const congregantesSyncChannel = sb.channel('congregantes-sync')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'congregantes' }, async () => {
           if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
@@ -1511,23 +1505,22 @@
             if (realtimeRefreshInFlight) return;
             realtimeRefreshInFlight = true;
             try {
-              await cargarCongregantes();
-              if (state.usuario?.rol === 'nangareko') {
-                await cargarDatosNangareko();
-              }
-              if (state.usuario?.rol === 'pastor') {
-                await cargarDatosPastor();
-              }
-              if (state.usuario?.rol === 'lider_dc') {
-                await cargarDatosLiderDC();
-              }
-              if (['asistencia', 'home', 'nangareko-alertas', 'nangareko-cuidados', 'lider-dc-asistencia'].includes(state.pantalla)) {
+              // Solo recargamos si el usuario está en pantallas seguras (no en medio de una ficha o edición)
+              const pantallaSegura = ['home', 'asistencia', 'pastor-congregacion', 'pastor-lideres', 'pastor-grupos', 'nangareko-cuidados', 'lider-dc-asistencia'].includes(state.pantalla);
+              if (pantallaSegura) {
+                await cargarCongregantes();
+                if (state.usuario?.rol === 'nangareko') await cargarDatosNangareko();
+                if (state.usuario?.rol === 'pastor') await cargarDatosPastor();
+                if (state.usuario?.rol === 'lider_dc') await cargarDatosLiderDC();
                 render();
+              } else {
+                // En pantallas de edición/ficha, solo mostramos aviso silencioso
+                mostrarToast('🔄 Hay datos nuevos. Volvé al inicio para verlos.', 'error');
               }
             } finally {
               realtimeRefreshInFlight = false;
             }
-          }, 500);
+          }, 10000); // Debounce de 10 segundos para no saturar
         })
         .subscribe();
 
@@ -2523,16 +2516,16 @@ async function cargarDatosPastor() {
             const iniciales = (c.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
             const expandido = state.pastorCongreganteExpandidoId === c.id;
             return `
-              <div class="info-section" style="margin-bottom:8px;padding:12px;cursor:pointer" onclick="togglePastorCongreganteDetalle('${c.id}')">
-                <div class="info-row" style="align-items:center">
-                  <div style="display:flex;align-items:center;gap:8px">
-                    <div class="congregante-foto" style="width:44px;height:44px;cursor:zoom-in;flex-shrink:0" onclick="event.stopPropagation(); abrirFotoCongregante('${c.id}')">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
+              <div class="info-section" style="margin-bottom:6px;padding:8px;cursor:pointer" onclick="togglePastorCongreganteDetalle('${c.id}')">
+                <div class="info-row" style="align-items:center;padding:0">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="congregante-foto" style="width:36px;height:36px;cursor:zoom-in;flex-shrink:0" onclick="event.stopPropagation(); abrirFotoCongregante('${c.id}')">${c.foto_url ? `<img src="${sanitizar(c.foto_url)}" />` : sanitizar(iniciales || '?')}</div>
                     <div>
-                      <div class="label" style="font-weight:700;color:rgba(255,255,255,0.92)">${sanitizar(c.nombre)}</div>
-                      <div class="congregante-estado estado-${c.estado}" style="font-size:12px;margin-top:4px">${estadoLabel(c.estado)}</div>
+                      <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,0.92);line-height:1.2">${sanitizar(c.nombre)}</div>
+                      <div class="congregante-estado estado-${c.estado}" style="font-size:11px;margin-top:2px;line-height:1.2">${estadoLabel(c.estado)}</div>
                     </div>
                   </div>
-                  <span style="color:var(--texto-suave);font-size:18px">${expandido ? '⌃' : '⌄'}</span>
+                  <span style="color:var(--texto-suave);font-size:16px">${expandido ? '⌃' : '⌄'}</span>
                 </div>
 
                 ${expandido ? `
@@ -2561,9 +2554,9 @@ async function cargarDatosPastor() {
                   <span>${nangareko ? sanitizar(nangareko.nombre) : '—'}</span>
                 </div>
 
-                <div class="mobile-actions" style="display:flex; gap:8px; margin-top:12px">
-                  <button class="btn-primary" style="flex:1; padding:10px" onclick="event.stopPropagation(); abrirFichaPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📝 Registrar contacto</button>
-                  <button class="btn-primary" style="flex:1; padding:10px; background:var(--gris-medio)" onclick="event.stopPropagation(); verHistorialFichasPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📜 Historial</button>
+                <div class="mobile-actions" style="display:flex; gap:6px; margin-top:8px">
+                  <button class="btn-primary" style="flex:1; padding:8px; font-size:13px" onclick="event.stopPropagation(); abrirFichaPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📝 Contacto</button>
+                  <button class="btn-primary" style="flex:1; padding:8px; font-size:13px; background:var(--gris-medio)" onclick="event.stopPropagation(); verHistorialFichasPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📜 Historial</button>
                 </div>
                 ` : ''}
               </div>`;
@@ -5062,17 +5055,8 @@ async function cargarDatosPastor() {
         }
       });
 
-      window.addEventListener('focus', async () => {
-        if (state.session) {
-          try { await asegurarSesionVigente(); } catch (e) { console.error(e); }
-        }
-      });
-
-      setInterval(async () => {
-        if (state.session) {
-          try { await asegurarSesionVigente(); } catch (e) { console.error(e); }
-        }
-      }, 5 * 60 * 1000);
+      // Eliminado: window.addEventListener('focus') redundante (ya cubierto por visibilitychange)
+      // Eliminado: setInterval periódico para evitar requests en segundo plano que congelan la app
 
       if (session) {
         await cargarUsuario();
