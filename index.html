@@ -442,7 +442,7 @@
       height: 12px;
       background: var(--verde);
       border-radius: 50%;
-      box-shadow: 0 0 0 2px rgba(0,0,0,0.35);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
       z-index: 2;
     }
 
@@ -697,7 +697,7 @@
       transition: all 0.2s;
     }
 
-    .foto-upload > div {
+    .foto-upload>div {
       width: 100%;
       height: 100%;
       display: flex;
@@ -993,6 +993,7 @@
     let handlingPopState = false;
     let historyInitialized = false;
     let pendingPopTarget = null;
+    const asistenciaLocks = new Map();
 
     let state = {
       loading: true,
@@ -1035,10 +1036,14 @@
       pastorPendientesLideres: [],
       pastorPendientesMiembros: [],
       pastorMotivosSinRespuesta: {},
+      pastorSolicitudesCuidadoPastoral: {},
+      pastorAlertasDemora: [],
+      pastorSemaforoNangarekos: {},
       // Ñangareko
       misCuidados: [],
       alertasNuevos: [],
       nangarekoAvisos: [],
+      congregantesConPrimerContacto: new Set(),
       congreganteEstancadoIds: new Set(),
       contactosSemana: 0,
       congreganteSeleccionado: null,
@@ -1481,8 +1486,8 @@
       const totalPendientes = rol === 'pastor' ?
         ((state.pastorPendientesLideres?.length || 0) + (state.pastorPendientesMiembros?.length || 0)) :
         rol === 'nangareko' ? (state.nangarekoAvisos?.length || 0) :
-        rol === 'lider_dc' ? (state.liderDCAvisos?.length || 0) :
-        0;
+          rol === 'lider_dc' ? (state.liderDCAvisos?.length || 0) :
+            0;
 
       const pendientes = [
         `${nombre}, tenés ${totalPendientes} persona(s) que atender hoy`,
@@ -2402,8 +2407,8 @@
           `<div class="info-section" style="margin-bottom:12px">
             <h3>Visitantes <span style="font-size:12px;color:var(--texto-suave)">(${visitasOrdenadas.length})</span></h3>
             ${visitasOrdenadas.map(v => {
-              const iniciales = (v.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-              return `
+            const iniciales = (v.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            return `
               <div class="info-section" style="margin-bottom:8px;padding:8px;border-bottom:1px solid rgba(255,255,255,0.04)">
                 <div class="info-row" style="align-items:center">
                   <div style="display:flex;align-items:center;gap:8px;flex:1">
@@ -2416,7 +2421,7 @@
                   <button class="btn-primary" style="padding:8px;font-size:13px" onclick="cambiarEstadoVisita('${v.id}', 'nuevo')">Cambiar estado</button>
                 </div>
               </div>`;
-            }).join('')}
+          }).join('')}
           </div>`
         }
       </div>`;
@@ -2539,6 +2544,25 @@
                   </div>
                   <button class="btn-primary" style="padding:8px;font-size:13px;width:auto" onclick="abrirDetalleNangarekoPastor('${n.id}')">Ver supervisión</button>
                 </div>
+                ${(() => {
+              const metricas = state.pastorSemaforoNangarekos?.[String(n.id)] || {};
+              const ultimaFicha = metricas.ultimaFichaDias == null ? 'Sin fichas' : `${metricas.ultimaFichaDias} días`;
+              return `
+                    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px">
+                      <div style="text-align:center;padding:8px 4px;background:rgba(255,255,255,0.04);border-radius:8px">
+                        <div style="font-size:18px;font-weight:700;color:var(--verde)">${metricas.activos ?? '—'}</div>
+                        <div style="font-size:10px;color:var(--texto-suave)">Casos activos</div>
+                      </div>
+                      <div style="text-align:center;padding:8px 4px;background:rgba(255,255,255,0.04);border-radius:8px">
+                        <div style="font-size:18px;font-weight:700;color:var(--dorado)">${metricas.sinContacto ?? '—'}</div>
+                        <div style="font-size:10px;color:var(--texto-suave)">Sin 1.er contacto real</div>
+                      </div>
+                      <div style="text-align:center;padding:8px 4px;background:rgba(255,255,255,0.04);border-radius:8px">
+                        <div style="font-size:14px;font-weight:700;color:var(--texto)">${ultimaFicha}</div>
+                        <div style="font-size:10px;color:var(--texto-suave)">Desde última ficha</div>
+                      </div>
+                    </div>`;
+            })()}
               </div>
             `).join('')}
           </div>`
@@ -2567,8 +2591,8 @@
         <div class="info-section">
           <h3>Cuidados Actuales</h3>
           ${actuales.length === 0 ?
-            `<div class="info-row"><span class="label">No hay personas en cuidado activo</span></div>` :
-            actuales.map(c => `
+          `<div class="info-row"><span class="label">No hay personas en cuidado activo</span></div>` :
+          actuales.map(c => `
               <div class="info-row" style="align-items:flex-start;flex-direction:column;gap:6px;padding-bottom:12px;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06)">
                 <span style="font-weight:600">${sanitizar(c.nombre || '—')}</span>
                 <span style="font-size:12px;color:var(--texto-suave)">${estadoLabel(c.estado)}</span>
@@ -2576,9 +2600,9 @@
                   <select id="select-reasignar-${c.id}" class="input-field" style="flex:1">
                     <option value="">Mover a...</option>
                     ${(state.pastorNangarekos || [])
-                      .filter(n => n.id !== usuario?.id)
-                      .map(n => `<option value="${n.id}">${sanitizar(n.nombre || '(Sin nombre)')}</option>`)
-                      .join('')}
+              .filter(n => n.id !== usuario?.id)
+              .map(n => `<option value="${n.id}">${sanitizar(n.nombre || '(Sin nombre)')}</option>`)
+              .join('')}
                   </select>
                   <button class="btn-primary" style="width:auto;padding:8px 12px;font-size:13px;background:var(--dorado)" onclick="reasignarUnCuidado('${c.id}', '${usuario?.id}')">
                     Mover
@@ -2586,20 +2610,20 @@
                 </div>
               </div>
             `).join('')
-          }
+        }
         </div>
 
         <div class="info-section">
           <h3>Historial de Cuidados</h3>
           ${historial.length === 0 ?
-            `<div class="info-row"><span class="label">No hay historial de cuidados completados</span></div>` :
-            historial.slice(0, 20).map(c => `
+          `<div class="info-row"><span class="label">No hay historial de cuidados completados</span></div>` :
+          historial.slice(0, 20).map(c => `
               <div class="info-row" style="align-items:flex-start;flex-direction:column;gap:4px">
                 <span style="font-weight:600">${sanitizar(c.nombre || '—')}</span>
                 <span style="font-size:12px;color:var(--texto-suave)">${estadoLabel(c.estado)}${c.grupo_dc_id ? ' · En DC' : ''}</span>
               </div>
             `).join('')
-          }
+        }
         </div>
       </div>`;
     }
@@ -2816,6 +2840,34 @@
         </div>
 
         <div class="info-section">
+          <h3>⚠️ Seguimiento atrasado</h3>
+          ${(state.pastorAlertasDemora || []).length > 0 ?
+          (state.pastorAlertasDemora || []).map(c => {
+            const nangarekos = state.pastorNangarekos?.length
+              ? state.pastorNangarekos
+              : (state.lideres || []).filter(n => n?.rol === 'nangareko');
+            return `
+                <div class="info-row" style="align-items:flex-start;flex-direction:column;gap:8px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+                  <div style="width:100%;display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+                    <span class="label">${sanitizar(c.nombre || 'Sin nombre')}</span>
+                    <span style="font-size:12px;color:var(--texto-suave);text-align:right">${sanitizar(c.motivo)} · ${c.dias} días</span>
+                  </div>
+                  <div style="display:flex;gap:8px;width:100%;align-items:center">
+                    <select id="select-pastor-asignar-${c.id}" class="input-field" style="flex:1">
+                      <option value="">${c.nangarekoId ? 'Reasignar a...' : 'Asignar a...'}</option>
+                      ${nangarekos.map(n => `<option value="${n.id}" ${String(n.id) === String(c.nangarekoId || '') ? 'selected' : ''}>${sanitizar(n.nombre || '(Sin nombre)')}</option>`).join('')}
+                    </select>
+                    <button class="btn-primary" style="width:auto;padding:8px 12px;font-size:13px;background:var(--dorado)" onclick="asignarNangarekoPastor('${c.id}')">
+                      ${c.nangarekoId ? 'Reasignar' : 'Asignar'}
+                    </button>
+                  </div>
+                </div>`;
+          }).join('') :
+          '<div class="info-row"><span class="label">No hay seguimientos atrasados</span></div>'
+        }
+        </div>
+
+        <div class="info-section">
           <h3>🧠 Juego del Hory — últimos resultados</h3>
           ${(state.lideres || []).filter(u => u?.rol === 'hory' && u?.ultimo_resultado_hory).length > 0 ?
           (state.lideres || [])
@@ -2907,113 +2959,126 @@
     `;
     }
 
-async function cargarDatosPastor() {
-    if (!state.usuario || state.usuario.rol !== 'pastor') return;
+    window.asignarNangarekoPastor = async function (congreganteId) {
+      try {
+        const select = document.getElementById(`select-pastor-asignar-${congreganteId}`);
+        const destinoId = select?.value;
+        if (!destinoId) {
+          mostrarToast('⚠️ Elegí un Ñangareko para asignar el seguimiento', 'error');
+          return;
+        }
 
-    const fechaLimite = new Date();
-    fechaLimite.setDate(fechaLimite.getDate() - 7);
-    const fechaStr = fechaLimite.toISOString().split('T')[0];
+        const congregante = (state.congregantes || []).find(c => String(c?.id) === String(congreganteId));
+        if (!congregante || !esCongreganteActivo(congregante)) {
+          mostrarToast('⚠️ Esta persona ya no está en seguimiento activo', 'error');
+          return;
+        }
 
-    const fechaInicioMes = new Date();
-    fechaInicioMes.setMonth(fechaInicioMes.getMonth() - 1);
-    const fechaInicioMesStr = fechaInicioMes.toISOString().split('T')[0];
+        const patch = {
+          nangareko_id: destinoId,
+          nangareko_asignado_en: new Date().toISOString()
+        };
+        if (normalizarEstado(congregante.estado) === 'nuevo') patch.estado = 'en_proceso';
 
-    const [
-      congregantesRes,
-      lideresRes,
-      nuevosRes,
-      asistDomRes,
-      asistMieRes,
-      ausenciasUltMesRes,
-      ausenciasSemanaRes,
-      ultimosRes,
-      alertasRes,
-      gruposRes
-    ] = await Promise.all([
-      sb.from('congregantes').select('*').order('nombre', { ascending: true }),
-      sb.from('usuarios').select('*').order('nombre', { ascending: true }),
-      sb.from('congregantes').select('id', { count: 'exact' }).gte('created_at', fechaStr),
-      sb.from('asistencias').select('presente').eq('tipo_servicio', 'domingo').gte('fecha', fechaStr),
-      sb.from('asistencias').select('presente').eq('tipo_servicio', 'miercoles').gte('fecha', fechaStr),
-      sb.from('asistencias').select('congregante_id, fecha, presente').gte('fecha', fechaInicioMesStr),
-      sb.from('asistencias').select('congregante_id, fecha, tipo_servicio').gte('fecha', fechaStr).eq('presente', false),
-      sb.from('congregantes').select('nombre, created_at').order('created_at', { ascending: false }).limit(5),
-      sb.from('alertas').select('tipo, mensaje, created_at').order('created_at', { ascending: false }).limit(5),
-      sb.from('grupos_dc').select('*, lider:lider_id(nombre)').order('created_at', { ascending: false })
-    ]);
+        const { error } = await sb.from('congregantes').update(patch).eq('id', congreganteId);
+        if (error) throw error;
 
-    if (congregantesRes.error) {
-      console.error('Error al cargar congregantes (Pastor):', congregantesRes.error);
-      mostrarToast('⚠️ No se pudieron cargar congregantes (ver permisos/RLS)', 'error');
-      state.congregantes = [];
-    } else {
-      state.congregantes = congregantesRes.data || [];
-    }
-
-    if (lideresRes.error) {
-      console.error('Error al cargar usuarios/líderes (Pastor):', lideresRes.error);
-      state.lideres = [];
-    } else {
-      state.lideres = lideresRes.data || [];
-    }
-
-    if (nuevosRes.error) {
-      console.error('Error al cargar nuevos (Pastor):', nuevosRes.error);
-      state.nuevosUltimaSemana = 0;
-    } else {
-      state.nuevosUltimaSemana = nuevosRes.data?.length || 0;
-    }
-
-    const asistenciasDomingo = asistDomRes.error ? [] : (asistDomRes.data || []);
-    const asistenciasMiercoles = asistMieRes.error ? [] : (asistMieRes.data || []);
-    const ausenciasUltMes = ausenciasUltMesRes.error ? [] : (ausenciasUltMesRes.data || []);
-    const ausenciasSemana = (typeof ausenciasSemanaRes !== 'undefined' && ausenciasSemanaRes.error) ? [] : (ausenciasSemanaRes?.data || []);
-    if (asistDomRes.error) console.error('Error al cargar asistencias domingo (Pastor):', asistDomRes.error);
-    if (asistMieRes.error) console.error('Error al cargar asistencias miércoles (Pastor):', asistMieRes.error);
-    if (ausenciasUltMesRes.error) console.error('Error al cargar ausencias último mes (Pastor):', ausenciasUltMesRes.error);
-
-    const todasAsistencias = [...asistenciasDomingo, ...asistenciasMiercoles];
-    if (todasAsistencias.length > 0) {
-      const presentes = todasAsistencias.filter(a => a.presente).length;
-      state.asistenciaPromedio = Math.round((presentes / todasAsistencias.length) * 100);
-    } else {
-      state.asistenciaPromedio = 0;
-    }
-
-    const congregantesActivos = (state.congregantes || []).filter(esCongreganteActivo);
-    // Agrupar ausencias por congregante con las fechas faltadas y encargado asignado
-    const ausenciasMap = {};
-    for (const a of (ausenciasUltMes || [])) {
-      if (!a?.congregante_id) continue;
-      if (a.presente) continue;
-      const id = String(a.congregante_id);
-      if (!ausenciasMap[id]) ausenciasMap[id] = { fechas: new Set() };
-      if (a.fecha) ausenciasMap[id].fechas.add(a.fecha);
-    }
-
-    const ausenciasUltMesCongregantes = Object.keys(ausenciasMap).map(id => {
-      const c = congregantesActivos.find(x => String(x?.id) === String(id)) || (state.congregantes || []).find(x => String(x?.id) === String(id)) || { id, nombre: 'Desconocido' };
-      const fechas = Array.from(ausenciasMap[id].fechas || []).sort();
-      let encargado = '';
-      if (c.nangareko_id) {
-        const u = (state.lideres || []).find(l => String(l?.id) === String(c.nangareko_id));
-        encargado = u?.nombre || '';
+        mostrarToast('✅ Seguimiento asignado correctamente');
+        await cargarDatosPastor();
+        render();
+      } catch (e) {
+        console.error('Error al asignar/reasignar seguimiento desde el panel del pastor:', e);
+        mostrarToast('⚠️ No se pudo asignar el seguimiento. Revisá conexión/permisos.', 'error');
       }
-      if (!encargado && c.grupo_dc_id) {
-        const g = (state.gruposDC || []).find(g => String(g?.id) === String(c.grupo_dc_id));
-        encargado = (g?.lider && g.lider.nombre) ? g.lider.nombre : (g?.lider?.nombre || '');
+    };
+
+    async function cargarDatosPastor() {
+      if (!state.usuario || state.usuario.rol !== 'pastor') return;
+
+      const fechaLimite = new Date();
+      fechaLimite.setDate(fechaLimite.getDate() - 7);
+      const fechaStr = fechaLimite.toISOString().split('T')[0];
+
+      const fechaInicioMes = new Date();
+      fechaInicioMes.setMonth(fechaInicioMes.getMonth() - 1);
+      const fechaInicioMesStr = fechaInicioMes.toISOString().split('T')[0];
+
+      const [
+        congregantesRes,
+        lideresRes,
+        nuevosRes,
+        asistDomRes,
+        asistMieRes,
+        ausenciasUltMesRes,
+        ausenciasSemanaRes,
+        ultimosRes,
+        alertasRes,
+        gruposRes
+      ] = await Promise.all([
+        sb.from('congregantes').select('*').order('nombre', { ascending: true }),
+        sb.from('usuarios').select('*').order('nombre', { ascending: true }),
+        sb.from('congregantes').select('id', { count: 'exact' }).gte('created_at', fechaStr),
+        sb.from('asistencias').select('presente').eq('tipo_servicio', 'domingo').gte('fecha', fechaStr),
+        sb.from('asistencias').select('presente').eq('tipo_servicio', 'miercoles').gte('fecha', fechaStr),
+        sb.from('asistencias').select('congregante_id, fecha, presente').gte('fecha', fechaInicioMesStr),
+        sb.from('asistencias').select('congregante_id, fecha, tipo_servicio').gte('fecha', fechaStr).eq('presente', false),
+        sb.from('congregantes').select('nombre, created_at').order('created_at', { ascending: false }).limit(5),
+        sb.from('alertas').select('tipo, mensaje, created_at').order('created_at', { ascending: false }).limit(5),
+        sb.from('grupos_dc').select('*, lider:lider_id(nombre)').order('created_at', { ascending: false })
+      ]);
+
+      if (congregantesRes.error) {
+        console.error('Error al cargar congregantes (Pastor):', congregantesRes.error);
+        mostrarToast('⚠️ No se pudieron cargar congregantes (ver permisos/RLS)', 'error');
+        state.congregantes = [];
+      } else {
+        state.congregantes = congregantesRes.data || [];
       }
-      return { id: c.id, nombre: c.nombre || '—', fechas, encargado };
-    }).filter(Boolean);
 
-    state.pastorAusenciasUltimoMes = ausenciasUltMesCongregantes;
-    state.pastorAusenciasUltimoMesCount = ausenciasUltMesCongregantes.length;
+      if (lideresRes.error) {
+        console.error('Error al cargar usuarios/líderes (Pastor):', lideresRes.error);
+        state.lideres = [];
+      } else {
+        state.lideres = lideresRes.data || [];
+      }
 
-    // Construir lista de ausencias en la última semana: una entrada por registro de ausencia
-    try {
-      const ausList = (ausenciasSemana || []).map(a => {
-        const id = String(a?.congregante_id || '');
-        const c = congregantesActivos.find(x => String(x?.id) === id) || (state.congregantes || []).find(x => String(x?.id) === id) || { id, nombre: 'Desconocido' };
+      if (nuevosRes.error) {
+        console.error('Error al cargar nuevos (Pastor):', nuevosRes.error);
+        state.nuevosUltimaSemana = 0;
+      } else {
+        state.nuevosUltimaSemana = nuevosRes.data?.length || 0;
+      }
+
+      const asistenciasDomingo = asistDomRes.error ? [] : (asistDomRes.data || []);
+      const asistenciasMiercoles = asistMieRes.error ? [] : (asistMieRes.data || []);
+      const ausenciasUltMes = ausenciasUltMesRes.error ? [] : (ausenciasUltMesRes.data || []);
+      const ausenciasSemana = (typeof ausenciasSemanaRes !== 'undefined' && ausenciasSemanaRes.error) ? [] : (ausenciasSemanaRes?.data || []);
+      if (asistDomRes.error) console.error('Error al cargar asistencias domingo (Pastor):', asistDomRes.error);
+      if (asistMieRes.error) console.error('Error al cargar asistencias miércoles (Pastor):', asistMieRes.error);
+      if (ausenciasUltMesRes.error) console.error('Error al cargar ausencias último mes (Pastor):', ausenciasUltMesRes.error);
+
+      const todasAsistencias = [...asistenciasDomingo, ...asistenciasMiercoles];
+      if (todasAsistencias.length > 0) {
+        const presentes = todasAsistencias.filter(a => a.presente).length;
+        state.asistenciaPromedio = Math.round((presentes / todasAsistencias.length) * 100);
+      } else {
+        state.asistenciaPromedio = 0;
+      }
+
+      const congregantesActivos = (state.congregantes || []).filter(esCongreganteActivo);
+      // Agrupar ausencias por congregante con las fechas faltadas y encargado asignado
+      const ausenciasMap = {};
+      for (const a of (ausenciasUltMes || [])) {
+        if (!a?.congregante_id) continue;
+        if (a.presente) continue;
+        const id = String(a.congregante_id);
+        if (!ausenciasMap[id]) ausenciasMap[id] = { fechas: new Set() };
+        if (a.fecha) ausenciasMap[id].fechas.add(a.fecha);
+      }
+
+      const ausenciasUltMesCongregantes = Object.keys(ausenciasMap).map(id => {
+        const c = congregantesActivos.find(x => String(x?.id) === String(id)) || (state.congregantes || []).find(x => String(x?.id) === String(id)) || { id, nombre: 'Desconocido' };
+        const fechas = Array.from(ausenciasMap[id].fechas || []).sort();
         let encargado = '';
         if (c.nangareko_id) {
           const u = (state.lideres || []).find(l => String(l?.id) === String(c.nangareko_id));
@@ -3023,201 +3088,299 @@ async function cargarDatosPastor() {
           const g = (state.gruposDC || []).find(g => String(g?.id) === String(c.grupo_dc_id));
           encargado = (g?.lider && g.lider.nombre) ? g.lider.nombre : (g?.lider?.nombre || '');
         }
-        return { id: c.id, nombre: c.nombre || '—', fecha: String(a.fecha).slice(0,10), encargado };
-      });
-      state.pastorAusenciasSemana = ausList;
-    } catch (e) {
-      console.error('Error al procesar ausencias semana:', e);
-      state.pastorAusenciasSemana = [];
-    }
+        return { id: c.id, nombre: c.nombre || '—', fechas, encargado };
+      }).filter(Boolean);
 
-    state.pastorStats = {
-      domingo_presentes_7d: asistenciasDomingo.filter(a => a.presente).length,
-      miercoles_presentes_7d: asistenciasMiercoles.filter(a => a.presente).length,
-      total_congregantes: congregantesActivos.length,
-      atendidos_por_nangareko: congregantesActivos.filter(c => Boolean(c?.nangareko_id)).length,
-      en_dc: congregantesActivos.filter(c => Boolean(c?.grupo_dc_id) && ['en_dc', 'graduado'].includes(c?.estado)).length,
-      faltaron_ultimo_mes: ausenciasUltMesCongregantes.length
-    };
+      state.pastorAusenciasUltimoMes = ausenciasUltMesCongregantes;
+      state.pastorAusenciasUltimoMesCount = ausenciasUltMesCongregantes.length;
 
-    // Cargar visitas (estado = 'visita')
-    const visitas = (state.congregantes || []).filter(c => c?.estado === 'visita');
-    state.pastorVisitas = visitas;
+      // Construir lista de ausencias en la última semana: una entrada por registro de ausencia
+      try {
+        const ausList = (ausenciasSemana || []).map(a => {
+          const id = String(a?.congregante_id || '');
+          const c = congregantesActivos.find(x => String(x?.id) === id) || (state.congregantes || []).find(x => String(x?.id) === id) || { id, nombre: 'Desconocido' };
+          let encargado = '';
+          if (c.nangareko_id) {
+            const u = (state.lideres || []).find(l => String(l?.id) === String(c.nangareko_id));
+            encargado = u?.nombre || '';
+          }
+          if (!encargado && c.grupo_dc_id) {
+            const g = (state.gruposDC || []).find(g => String(g?.id) === String(c.grupo_dc_id));
+            encargado = (g?.lider && g.lider.nombre) ? g.lider.nombre : (g?.lider?.nombre || '');
+          }
+          return { id: c.id, nombre: c.nombre || '—', fecha: String(a.fecha).slice(0, 10), encargado };
+        });
+        state.pastorAusenciasSemana = ausList;
+      } catch (e) {
+        console.error('Error al procesar ausencias semana:', e);
+        state.pastorAusenciasSemana = [];
+      }
 
-    if (ultimosRes.error) {
-      console.error('Error al cargar últimos ingresos (Pastor):', ultimosRes.error);
-      state.ultimosCongregantes = [];
-    } else {
-      state.ultimosCongregantes = ultimosRes.data || [];
-    }
+      state.pastorStats = {
+        domingo_presentes_7d: asistenciasDomingo.filter(a => a.presente).length,
+        miercoles_presentes_7d: asistenciasMiercoles.filter(a => a.presente).length,
+        total_congregantes: congregantesActivos.length,
+        atendidos_por_nangareko: congregantesActivos.filter(c => Boolean(c?.nangareko_id)).length,
+        en_dc: congregantesActivos.filter(c => Boolean(c?.grupo_dc_id) && ['en_dc', 'graduado'].includes(c?.estado)).length,
+        faltaron_ultimo_mes: ausenciasUltMesCongregantes.length
+      };
 
-    if (alertasRes.error) {
-      console.error('Error al cargar alertas (Pastor):', alertasRes.error);
-      state.alertasRecientes = [];
-    } else {
-      state.alertasRecientes = alertasRes.data || [];
-    }
+      // Cargar visitas (estado = 'visita')
+      const visitas = (state.congregantes || []).filter(c => c?.estado === 'visita');
+      state.pastorVisitas = visitas;
 
-    if (gruposRes.error) {
-      console.error('Error al cargar grupos DC (Pastor):', gruposRes.error);
-      state.gruposDC = [];
-    } else {
-      state.gruposDC = gruposRes.data || [];
-    }
-
-    try {
-      const ids = (state.congregantes || []).map(c => c?.id).filter(Boolean);
-      if (ids.length > 0) {
-        const { data, error } = await withTimeout(
-          sb.from('fichas_nangareko')
-            .select('congregante_id, nangareko_id, created_at')
-            .in('congregante_id', ids)
-            .order('created_at', { ascending: false })
-            .limit(2000),
-          20000,
-          'cargar ultimo nangareko'
-        );
-        if (error) throw error;
-        const map = {};
-        for (const f of (data || [])) {
-          if (!f?.congregante_id || !f?.nangareko_id) continue;
-          if (!map[f.congregante_id]) map[f.congregante_id] = f.nangareko_id;
-        }
-        state.pastorUltimoNangarekoPorCongregante = map;
+      if (ultimosRes.error) {
+        console.error('Error al cargar últimos ingresos (Pastor):', ultimosRes.error);
+        state.ultimosCongregantes = [];
       } else {
+        state.ultimosCongregantes = ultimosRes.data || [];
+      }
+
+      if (alertasRes.error) {
+        console.error('Error al cargar alertas (Pastor):', alertasRes.error);
+        state.alertasRecientes = [];
+      } else {
+        state.alertasRecientes = alertasRes.data || [];
+      }
+
+      if (gruposRes.error) {
+        console.error('Error al cargar grupos DC (Pastor):', gruposRes.error);
+        state.gruposDC = [];
+      } else {
+        state.gruposDC = gruposRes.data || [];
+      }
+
+      try {
+        const ids = (state.congregantes || []).map(c => c?.id).filter(Boolean);
+        if (ids.length > 0) {
+          const { data, error } = await withTimeout(
+            sb.from('fichas_nangareko')
+              .select('congregante_id, nangareko_id, created_at')
+              .in('congregante_id', ids)
+              .order('created_at', { ascending: false })
+              .limit(2000),
+            20000,
+            'cargar ultimo nangareko'
+          );
+          if (error) throw error;
+          const map = {};
+          for (const f of (data || [])) {
+            if (!f?.congregante_id || !f?.nangareko_id) continue;
+            if (!map[f.congregante_id]) map[f.congregante_id] = f.nangareko_id;
+          }
+          state.pastorUltimoNangarekoPorCongregante = map;
+        } else {
+          state.pastorUltimoNangarekoPorCongregante = {};
+        }
+      } catch (e) {
+        console.error('Error al cargar ultimo nangareko por congregante:', e);
         state.pastorUltimoNangarekoPorCongregante = {};
       }
-    } catch (e) {
-      console.error('Error al cargar ultimo nangareko por congregante:', e);
-      state.pastorUltimoNangarekoPorCongregante = {};
-    }
 
-    try {
-      const idsSinResp = (state.congregantes || []).filter(c => c?.estado === 'sin_respuesta').map(c => c?.id).filter(Boolean);
-      if (idsSinResp.length > 0) {
-        const { data, error } = await withTimeout(
-          sb.from('fichas_nangareko')
-            .select('congregante_id, nangareko_id, notas_adicionales, created_at')
-            .in('congregante_id', idsSinResp)
-            .eq('tipo_contacto', 'sin_respuesta')
-            .order('created_at', { ascending: false }),
-          20000,
-          'cargar motivos sin respuesta'
-        );
-        if (error) throw error;
-        const map = {};
-        for (const f of (data || [])) {
-          if (!f?.congregante_id) continue;
-          if (!map[f.congregante_id]) map[f.congregante_id] = f;
+      try {
+        const idsSinResp = (state.congregantes || []).filter(c => c?.estado === 'sin_respuesta').map(c => c?.id).filter(Boolean);
+        if (idsSinResp.length > 0) {
+          const { data, error } = await withTimeout(
+            sb.from('fichas_nangareko')
+              .select('congregante_id, nangareko_id, notas_adicionales, created_at')
+              .in('congregante_id', idsSinResp)
+              .eq('tipo_contacto', 'sin_respuesta')
+              .order('created_at', { ascending: false }),
+            20000,
+            'cargar motivos sin respuesta'
+          );
+          if (error) throw error;
+          const map = {};
+          for (const f of (data || [])) {
+            if (!f?.congregante_id) continue;
+            if (!map[f.congregante_id]) map[f.congregante_id] = f;
+          }
+          state.pastorMotivosSinRespuesta = map;
+        } else {
+          state.pastorMotivosSinRespuesta = {};
         }
-        state.pastorMotivosSinRespuesta = map;
-      } else {
+      } catch (e) {
+        console.error('Error al cargar motivos sin respuesta:', e);
         state.pastorMotivosSinRespuesta = {};
       }
-    } catch (e) {
-      console.error('Error al cargar motivos sin respuesta:', e);
-      state.pastorMotivosSinRespuesta = {};
-    }
 
-    try {
-      const idsSolicitudes = (state.congregantes || []).filter(c => c?.cuidado_pastoral_solicitado === true).map(c => c?.id).filter(Boolean);
-      if (idsSolicitudes.length > 0) {
-        const { data, error } = await withTimeout(
-          sb.from('fichas_nangareko')
-            .select('congregante_id, nangareko_id, notas_adicionales, created_at')
-            .in('congregante_id', idsSolicitudes)
-            .eq('tipo_contacto', 'solicitud_cuidado_pastoral')
-            .order('created_at', { ascending: false }),
-          20000,
-          'cargar solicitudes de cuidado pastoral'
-        );
-        if (error) throw error;
-        const map = {};
-        for (const f of (data || [])) {
-          if (!f?.congregante_id) continue;
-          if (!map[f.congregante_id]) map[f.congregante_id] = f;
+      try {
+        const idsSolicitudes = (state.congregantes || []).filter(c => c?.cuidado_pastoral_solicitado === true).map(c => c?.id).filter(Boolean);
+        if (idsSolicitudes.length > 0) {
+          const { data, error } = await withTimeout(
+            sb.from('fichas_nangareko')
+              .select('congregante_id, nangareko_id, notas_adicionales, created_at')
+              .in('congregante_id', idsSolicitudes)
+              .eq('tipo_contacto', 'solicitud_cuidado_pastoral')
+              .order('created_at', { ascending: false }),
+            20000,
+            'cargar solicitudes de cuidado pastoral'
+          );
+          if (error) throw error;
+          const map = {};
+          for (const f of (data || [])) {
+            if (!f?.congregante_id) continue;
+            if (!map[f.congregante_id]) map[f.congregante_id] = f;
+          }
+          state.pastorSolicitudesCuidadoPastoral = map;
+        } else {
+          state.pastorSolicitudesCuidadoPastoral = {};
         }
-        state.pastorSolicitudesCuidadoPastoral = map;
-      } else {
+      } catch (e) {
+        console.error('Error al cargar solicitudes de cuidado pastoral:', e);
         state.pastorSolicitudesCuidadoPastoral = {};
       }
-    } catch (e) {
-      console.error('Error al cargar solicitudes de cuidado pastoral:', e);
-      state.pastorSolicitudesCuidadoPastoral = {};
+
+      try {
+        const idsTodas = (state.congregantes || []).map(c => c?.id).filter(Boolean);
+        let fichas = [];
+        if (idsTodas.length > 0) {
+          const { data, error } = await withTimeout(
+            sb.from('fichas_nangareko')
+              .select('congregante_id, tipo_contacto, notas_adicionales, created_at, nangareko_id')
+              .in('congregante_id', idsTodas)
+              .order('created_at', { ascending: false }),
+            20000,
+            'cargar fichas control pastoral'
+          );
+          if (error) throw error;
+          fichas = data || [];
+        }
+
+        const reales = new Map();
+        for (const f of fichas) {
+          const nota = String(f?.notas_adicionales || '').trim();
+          const tipo = String(f?.tipo_contacto || '').trim();
+          if (nota !== 'Primer contacto - Asignación inicial' && !['sin_respuesta', 'solicitud_cuidado_pastoral'].includes(tipo)) {
+            const id = String(f.congregante_id);
+            if (!reales.has(id)) reales.set(id, []);
+            reales.get(id).push(f);
+          }
+        }
+
+        const ahora = Date.now();
+        const diffDias = fecha => fecha ? Math.floor((ahora - new Date(fecha).getTime()) / 86400000) : 0;
+        const demorados = [];
+        for (const c of (state.congregantes || [])) {
+          const id = String(c.id);
+          const estado = normalizarEstado(c.estado);
+          let motivo = '';
+          let dias = 0;
+          if (estado === 'nuevo' && !c.nangareko_id) {
+            dias = diffDias(c.created_at);
+            if (dias >= 3) motivo = 'Nuevo sin asignar';
+          } else if (c.nangareko_id && ['nuevo', 'en_proceso', 'en_anua', 'bautizado', 'en_dc'].includes(estado)) {
+            dias = diffDias(c.nangareko_asignado_en || c.created_at);
+            if (dias >= 7 && !reales.has(id)) motivo = 'Asignado sin 1.er contacto real';
+          }
+          if (motivo) {
+            const n = (state.lideres || []).find(u => String(u.id) === String(c.nangareko_id));
+            demorados.push({ id: c.id, nombre: c.nombre || 'Sin nombre', dias, motivo, nangarekoId: c.nangareko_id || null, nangareko: n?.nombre || null });
+          }
+        }
+        state.pastorAlertasDemora = demorados;
+
+        state.pastorSemaforoNangarekos = {};
+        const nangarekos = (state.pastorNangarekos?.length ? state.pastorNangarekos : (state.lideres || []).filter(u => u?.rol === 'nangareko'));
+        for (const n of nangarekos) {
+          const casos = (state.congregantes || []).filter(c => String(c.nangareko_id) === String(n.id) && esCongreganteActivo(c));
+          const sinContacto = casos.filter(c => !reales.has(String(c.id)));
+          const atrasados = sinContacto.filter(c => diffDias(c.nangareko_asignado_en || c.created_at) >= 7).length;
+          const fichasN = fichas.filter(f => String(f.nangareko_id) === String(n.id)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          state.pastorSemaforoNangarekos[String(n.id)] = {
+            activos: casos.length,
+            sinContacto: sinContacto.length,
+            atrasados,
+            ultimaFichaDias: fichasN[0]?.created_at ? diffDias(fichasN[0].created_at) : null
+          };
+        }
+
+        const hoyYmd = new Date().toISOString().split('T')[0];
+        for (const caso of demorados) {
+          const pushKey = `pastor_demora_push_${hoyYmd}_${caso.id}`;
+          if (localStorage.getItem(pushKey)) continue;
+          const mensaje = `${caso.nombre}: ${caso.motivo} (${caso.dias} días).`;
+          await sb.from('alertas').insert({ usuario_id: state.usuario.id, congregante_id: caso.id, tipo: 'demora_seguimiento', mensaje });
+          if (state.usuario.onesignal_push_id) await enviarPushA(state.usuario.onesignal_push_id, '⚠️ Seguimiento atrasado', mensaje);
+          try { localStorage.setItem(pushKey, '1'); } catch (e) { /* noop */ }
+        }
+      } catch (e) {
+        console.error('Error al calcular control pastoral:', e);
+        state.pastorAlertasDemora = [];
+      }
+
+      await calcularPendientesAlimentarPastor();
+
+      // Gráfico removido: ahora existe pantalla de estadísticas.
     }
 
-    await calcularPendientesAlimentarPastor();
+    async function calcularPendientesAlimentarPastor() {
+      try {
+        const hoy = new Date();
+        const addMes = (d, n) => {
+          const x = new Date(d);
+          const day = x.getDate();
+          x.setMonth(x.getMonth() + n);
+          if (x.getDate() !== day) x.setDate(0);
+          return x;
+        };
 
-    // Gráfico removido: ahora existe pantalla de estadísticas.
-}
+        const lideres = (state.lideres || []).filter(u => ['hory', 'nangareko', 'lider_dc'].includes(u?.rol) && u?.activo !== false);
+        const idsLideres = lideres.map(u => u.id).filter(Boolean);
 
-async function calcularPendientesAlimentarPastor() {
-  try {
-    const hoy = new Date();
-    const addMes = (d, n) => {
-      const x = new Date(d);
-      const day = x.getDate();
-      x.setMonth(x.getMonth() + n);
-      if (x.getDate() !== day) x.setDate(0);
-      return x;
-    };
+        let ultimaFichaLiderPorId = {};
+        if (idsLideres.length > 0) {
+          const { data, error } = await sb.from('fichas_pastor')
+            .select('lider_id, created_at')
+            .in('lider_id', idsLideres)
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          for (const f of (data || [])) {
+            if (!f?.lider_id) continue;
+            if (!ultimaFichaLiderPorId[f.lider_id]) ultimaFichaLiderPorId[f.lider_id] = f.created_at;
+          }
+        }
 
-    const lideres = (state.lideres || []).filter(u => ['hory', 'nangareko', 'lider_dc'].includes(u?.rol) && u?.activo !== false);
-    const idsLideres = lideres.map(u => u.id).filter(Boolean);
+        const pendientesLideres = lideres
+          .filter(u => {
+            const ultima = ultimaFichaLiderPorId[u.id];
+            const due = ultima ? addMes(new Date(ultima), 1) : hoy;
+            return hoy >= due;
+          })
+          .map(u => u.id);
 
-    let ultimaFichaLiderPorId = {};
-    if (idsLideres.length > 0) {
-      const { data, error } = await sb.from('fichas_pastor')
-        .select('lider_id, created_at')
-        .in('lider_id', idsLideres)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      for (const f of (data || [])) {
-        if (!f?.lider_id) continue;
-        if (!ultimaFichaLiderPorId[f.lider_id]) ultimaFichaLiderPorId[f.lider_id] = f.created_at;
+        const miembros = (state.congregantes || []).filter(c => esEstadoCuidadoPastoral(c?.estado));
+        const idsMiembros = miembros.map(c => c.id).filter(Boolean);
+
+        let ultimaFichaMiembroPorId = {};
+        if (idsMiembros.length > 0) {
+          const { data, error } = await sb.from('fichas_pastor_congregantes')
+            .select('congregante_id, created_at')
+            .in('congregante_id', idsMiembros)
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          for (const f of (data || [])) {
+            if (!f?.congregante_id) continue;
+            if (!ultimaFichaMiembroPorId[f.congregante_id]) ultimaFichaMiembroPorId[f.congregante_id] = f.created_at;
+          }
+        }
+
+        const pendientesMiembros = miembros
+          .filter(c => {
+            const ultima = ultimaFichaMiembroPorId[c.id];
+            const due = ultima ? addMes(new Date(ultima), 1) : hoy;
+            return hoy >= due;
+          })
+          .map(c => c.id);
+
+        state.pastorPendientesLideres = pendientesLideres;
+        state.pastorPendientesMiembros = pendientesMiembros;
+      } catch (e) {
+        console.error('Error al calcular pendientes de alimentar (Pastor):', e);
+        state.pastorPendientesLideres = state.pastorPendientesLideres || [];
+        state.pastorPendientesMiembros = state.pastorPendientesMiembros || [];
       }
     }
-
-    const pendientesLideres = lideres
-      .filter(u => {
-        const ultima = ultimaFichaLiderPorId[u.id];
-        const due = ultima ? addMes(new Date(ultima), 1) : hoy;
-        return hoy >= due;
-      })
-      .map(u => u.id);
-
-    const miembros = (state.congregantes || []).filter(c => esEstadoCuidadoPastoral(c?.estado));
-    const idsMiembros = miembros.map(c => c.id).filter(Boolean);
-
-    let ultimaFichaMiembroPorId = {};
-    if (idsMiembros.length > 0) {
-      const { data, error } = await sb.from('fichas_pastor_congregantes')
-        .select('congregante_id, created_at')
-        .in('congregante_id', idsMiembros)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      for (const f of (data || [])) {
-        if (!f?.congregante_id) continue;
-        if (!ultimaFichaMiembroPorId[f.congregante_id]) ultimaFichaMiembroPorId[f.congregante_id] = f.created_at;
-      }
-    }
-
-    const pendientesMiembros = miembros
-      .filter(c => {
-        const ultima = ultimaFichaMiembroPorId[c.id];
-        const due = ultima ? addMes(new Date(ultima), 1) : hoy;
-        return hoy >= due;
-      })
-      .map(c => c.id);
-
-    state.pastorPendientesLideres = pendientesLideres;
-    state.pastorPendientesMiembros = pendientesMiembros;
-  } catch (e) {
-    console.error('Error al calcular pendientes de alimentar (Pastor):', e);
-    state.pastorPendientesLideres = state.pastorPendientesLideres || [];
-    state.pastorPendientesMiembros = state.pastorPendientesMiembros || [];
-  }
-}
 
     function renderPastorEstadisticas() {
       const s = state.pastorStats || {};
@@ -3225,6 +3388,8 @@ async function calcularPendientesAlimentarPastor() {
 
       const poolEmbudo = (state.congregantes || []).filter(c => !['visita', 'sin_respuesta', 'cuidado_pastoral', 'transferido'].includes(normalizarEstado(c?.estado)));
       const totalIngresados = poolEmbudo.length;
+      const poolExcluidos = (state.congregantes || []).filter(c => ['visita', 'sin_respuesta', 'cuidado_pastoral', 'transferido'].includes(normalizarEstado(c?.estado)));
+      const totalGeneral = totalIngresados + poolExcluidos.length;
       const embudo = [
         { nombre: 'Ingresaron', emoji: '✨', color: '#4a90d9', cantidad: totalIngresados },
         { nombre: 'Tomados por un Ñangareko', emoji: '🤝', color: '#5aa9d9', cantidad: poolEmbudo.filter(c => c.nangareko_id || normalizarEstado(c.estado) !== 'nuevo').length },
@@ -3232,6 +3397,12 @@ async function calcularPendientesAlimentarPastor() {
         { nombre: 'Bautizados', emoji: '💧', color: '#f0c419', cantidad: poolEmbudo.filter(c => c.ya_bautizado).length },
         { nombre: 'En un DC', emoji: '🏠', color: '#7ed321', cantidad: poolEmbudo.filter(c => c.grupo_dc_id || ['en_dc', 'graduado'].includes(normalizarEstado(c.estado))).length },
         { nombre: 'Graduados', emoji: '🎓', color: '#2ecc71', cantidad: poolEmbudo.filter(c => normalizarEstado(c.estado) === 'graduado').length }
+      ];
+      const embudoExcluidos = [
+        { nombre: 'Visitas', emoji: '👋', color: '#9b59b6', cantidad: poolExcluidos.filter(c => normalizarEstado(c.estado) === 'visita').length },
+        { nombre: 'Sin respuesta', emoji: '📵', color: '#7f8c8d', cantidad: poolExcluidos.filter(c => normalizarEstado(c.estado) === 'sin_respuesta').length },
+        { nombre: 'Cuidado pastoral', emoji: '🩹', color: '#e67e22', cantidad: poolExcluidos.filter(c => normalizarEstado(c.estado) === 'cuidado_pastoral').length },
+        { nombre: 'Transferidos', emoji: '🚪', color: '#c0392b', cantidad: poolExcluidos.filter(c => normalizarEstado(c.estado) === 'transferido').length }
       ];
 
       return `
@@ -3243,11 +3414,11 @@ async function calcularPendientesAlimentarPastor() {
 
         <div class="info-section" style="margin-bottom:12px">
           <h3>🔻 Embudo de discipulado</h3>
-          <p style="font-size:12px;color:var(--texto-suave);margin-bottom:16px">De todos los que llegaron, ¿cuántos avanzan en cada etapa? (no incluye Visitas, Sin Respuesta ni Cuidado Pastoral)</p>
+          <p style="font-size:12px;color:var(--texto-suave);margin-bottom:16px">¿Cuántas personas avanzan en cada etapa del discipulado?</p>
           ${embudo.map(etapa => {
-            const pct = totalIngresados > 0 ? Math.round((etapa.cantidad / totalIngresados) * 100) : 0;
-            const anchoPct = totalIngresados > 0 ? Math.max((etapa.cantidad / totalIngresados) * 100, 4) : 4;
-            return `
+        const pct = totalIngresados > 0 ? Math.round((etapa.cantidad / totalIngresados) * 100) : 0;
+        const anchoPct = totalIngresados > 0 ? Math.max((etapa.cantidad / totalIngresados) * 100, 4) : 4;
+        return `
             <div style="margin-bottom:12px">
               <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
                 <span>${etapa.emoji} ${etapa.nombre}</span>
@@ -3257,7 +3428,22 @@ async function calcularPendientesAlimentarPastor() {
                 <div style="width:${anchoPct}%;background:${etapa.color};height:100%;border-radius:8px"></div>
               </div>
             </div>`;
-          }).join('')}
+      }).join('')}
+          <div style="border-top:1px solid rgba(255,255,255,0.08);margin:14px 0 10px 0;padding-top:10px;font-size:12px;color:var(--texto-suave)">Fuera del proceso de discipulado</div>
+          ${embudoExcluidos.map(etapa => {
+        const pct = totalGeneral > 0 ? Math.round((etapa.cantidad / totalGeneral) * 100) : 0;
+        const anchoPct = totalGeneral > 0 ? Math.max((etapa.cantidad / totalGeneral) * 100, 4) : 4;
+        return `
+            <div style="margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+                <span>${etapa.emoji} ${etapa.nombre}</span>
+                <span style="font-weight:700">${etapa.cantidad} <span style="color:var(--texto-suave);font-weight:400">(${pct}%)</span></span>
+              </div>
+              <div style="background:var(--gris-medio);border-radius:8px;overflow:hidden;height:20px">
+                <div style="width:${anchoPct}%;background:${etapa.color};height:100%;border-radius:8px"></div>
+              </div>
+            </div>`;
+      }).join('')}
         </div>
 
         <div class="info-section" style="margin-bottom:12px">
@@ -3268,9 +3454,9 @@ async function calcularPendientesAlimentarPastor() {
 
         <div class="info-section" style="margin-bottom:12px">
           <h3>Ausencias (última semana)</h3>
-          ${ (state.pastorAusenciasSemana || []).length === 0 ?
-            `<div class="info-row"><span class="label">No hay ausencias registradas en la semana</span></div>` :
-            (state.pastorAusenciasSemana || []).map(a => `
+          ${(state.pastorAusenciasSemana || []).length === 0 ?
+          `<div class="info-row"><span class="label">No hay ausencias registradas en la semana</span></div>` :
+          (state.pastorAusenciasSemana || []).map(a => `
               <div class="info-row" style="align-items:flex-start">
                 <div style="flex:1">
                   <div style="font-weight:700">${sanitizar(a.nombre)}</div>
@@ -3282,7 +3468,7 @@ async function calcularPendientesAlimentarPastor() {
                 </div>
               </div>
             `).join('')
-          }
+        }
         </div>
 
         <div class="info-section" style="margin-bottom:12px">
@@ -3395,8 +3581,8 @@ async function calcularPendientesAlimentarPastor() {
         <div class="info-section" style="margin-bottom:12px;opacity:0.75">
           <h3 style="margin:0 0 12px 0">🚫 Dados de baja <span style="font-size:12px;color:var(--texto-suave)">(${usuariosInactivos.length})</span></h3>
           ${usuariosInactivos.map(u => {
-            const iniciales = getIniciales(u.nombre || '');
-            return `
+          const iniciales = getIniciales(u.nombre || '');
+          return `
             <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.06)">
               <div class="info-row" style="align-items:center">
                 <div style="display:flex;align-items:center;gap:10px">
@@ -3406,7 +3592,7 @@ async function calcularPendientesAlimentarPastor() {
                 <button class="btn-primary" style="width:auto;padding:6px 12px;font-size:12px;background:var(--verde)" onclick="toggleActivoUsuario('${u.id}', true)">✅ Reactivar</button>
               </div>
             </div>`;
-          }).join('')}
+        }).join('')}
         </div>`;
       }
 
@@ -3542,14 +3728,14 @@ async function calcularPendientesAlimentarPastor() {
           <button class="btn-primary" style="margin-top:0" onclick="abrirFichaPastorLider('${sanitizar(u.id)}','${sanitizar(u.nombre || '')}')">📝 Registrar contacto</button>
           <div style="margin-top:12px">
             ${(state.pastorFichasLider || []).length === 0 ?
-              '<div class="info-row"><span class="label">Sin contactos registrados</span></div>' :
-              (state.pastorFichasLider || []).slice(0, 5).map(f => `
+          '<div class="info-row"><span class="label">Sin contactos registrados</span></div>' :
+          (state.pastorFichasLider || []).slice(0, 5).map(f => `
                 <div class="info-row">
                   <span class="label">${sanitizar(f.tipo_contacto || 'contacto')}</span>
                   <span style="font-size:12px;color:var(--texto-suave)">${new Date(f.created_at).toLocaleDateString()}</span>
                 </div>
               `).join('')
-            }
+        }
           </div>
         </div>
       </div>`;
@@ -3623,9 +3809,9 @@ async function calcularPendientesAlimentarPastor() {
         <div class="info-section" style="margin-bottom:12px;border:2px solid var(--dorado)">
           <h3 style="margin:0 0 12px 0">🙋 Solicitudes pendientes <span style="font-size:12px;color:var(--texto-suave)">(${solicitudes.length})</span></h3>
           ${solicitudes.map(s => {
-            const sol = state.pastorSolicitudesCuidadoPastoral?.[s.id] || null;
-            const nangareko = sol?.nangareko_id ? (state.lideres || []).find(n => n.id === sol.nangareko_id) : null;
-            return `
+        const sol = state.pastorSolicitudesCuidadoPastoral?.[s.id] || null;
+        const nangareko = sol?.nangareko_id ? (state.lideres || []).find(n => n.id === sol.nangareko_id) : null;
+        return `
             <div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.08)">
               <div class="info-row">
                 <span class="label">${sanitizar(s.nombre || '—')}</span>
@@ -3641,7 +3827,7 @@ async function calcularPendientesAlimentarPastor() {
                 <button class="btn-primary" style="flex:1;padding:8px;background:var(--gris-medio)" onclick="rechazarSolicitudCuidadoPastoral('${s.id}')">✖ Rechazar</button>
               </div>
             </div>`;
-          }).join('')}
+      }).join('')}
         </div>` : ''}
 
         ${miembros.length === 0 ?
@@ -3693,14 +3879,14 @@ async function calcularPendientesAlimentarPastor() {
       });
 
       return `${lista.length === 0 ?
-          `<div style="text-align:center;color:var(--texto-suave);padding:32px;font-size:14px">No se encontraron resultados.</div>` :
-          lista.map(c => {
-            const grupoActual = c.grupo_dc_id ? grupos.find(g => g.id === c.grupo_dc_id) : null;
-            const nangarekoId = c.nangareko_id || state.pastorUltimoNangarekoPorCongregante?.[c.id] || null;
-            const nangareko = nangarekoId ? nangarekos.find(n => n.id === nangarekoId) : null;
-            const iniciales = (c.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-            const expandido = state.pastorCongreganteExpandidoId === c.id;
-            return `
+        `<div style="text-align:center;color:var(--texto-suave);padding:32px;font-size:14px">No se encontraron resultados.</div>` :
+        lista.map(c => {
+          const grupoActual = c.grupo_dc_id ? grupos.find(g => g.id === c.grupo_dc_id) : null;
+          const nangarekoId = c.nangareko_id || state.pastorUltimoNangarekoPorCongregante?.[c.id] || null;
+          const nangareko = nangarekoId ? nangarekos.find(n => n.id === nangarekoId) : null;
+          const iniciales = (c.nombre || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          const expandido = state.pastorCongreganteExpandidoId === c.id;
+          return `
               <div class="info-section" style="margin-bottom:6px;padding:8px;cursor:pointer" onclick="togglePastorCongreganteDetalle('${c.id}')">
                 <div class="info-row" style="align-items:center;padding:0">
                   <div style="display:flex;align-items:center;gap:6px">
@@ -3754,13 +3940,13 @@ async function calcularPendientesAlimentarPastor() {
                   <button class="btn-primary" style="flex:1; padding:8px; font-size:13px" onclick="event.stopPropagation(); abrirFichaPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📝 Contacto</button>
                   <button class="btn-primary" style="flex:1; padding:8px; font-size:13px; background:var(--gris-medio)" onclick="event.stopPropagation(); verHistorialFichasPastorCongregante('${c.id}','${sanitizar(c.nombre || '')}')">📜 Historial</button>
                 </div>
-                ${(['graduado','en_dc'].includes(c.estado) && !((state.lideres || []).some(u => String(u?.congregante_vinculado_id) === String(c.id)))) ? `
+                ${(['graduado', 'en_dc'].includes(c.estado) && !((state.lideres || []).some(u => String(u?.congregante_vinculado_id) === String(c.id)))) ? `
                 <button class="btn-primary" style="width:100%; margin-top:8px; background:#2b8f5a; color:#ffffff; font-weight:600" onclick="event.stopPropagation(); pastorPromoverALider('${c.id}', '${sanitizar(c.nombre || '')}')">⬆️ Promover a líder</button>
                 ` : ''}
                 <button class="btn-secondary" style="width:100%; margin-top:8px; background:#b06a3a; color:#ffffff; font-weight:600" onclick="event.stopPropagation(); abrirMarcarTransferido('${c.id}', '${sanitizar(c.nombre || '')}')">🚪 Marcar Transferido a otra Iglesia</button>
                 ` : ''}
               </div>`;
-          }).join('')}
+        }).join('')}
       `;
     }
 
@@ -3964,33 +4150,33 @@ async function calcularPendientesAlimentarPastor() {
         <div class="info-section" style="margin-bottom:12px">
           <h3>Integrantes <span style="font-size:12px;color:var(--texto-suave)">(${miembros.length})</span></h3>
           ${miembros.length === 0 ?
-            `<div class="info-row"><span class="label">Sin integrantes</span></div>` :
-            miembros
-              .slice()
-              .sort((a, b) => String(a?.nombre || '').localeCompare(String(b?.nombre || '')))
-              .map(m => `<div class="info-row"><span class="label">${sanitizar(m.nombre || '—')}</span><span class="estado-${m.estado}">${estadoLabel(m.estado)}</span></div>`)
-              .join('')
-          }
+          `<div class="info-row"><span class="label">Sin integrantes</span></div>` :
+          miembros
+            .slice()
+            .sort((a, b) => String(a?.nombre || '').localeCompare(String(b?.nombre || '')))
+            .map(m => `<div class="info-row"><span class="label">${sanitizar(m.nombre || '—')}</span><span class="estado-${m.estado}">${estadoLabel(m.estado)}</span></div>`)
+            .join('')
+        }
         </div>
 
         <div class="info-section" style="margin-bottom:12px">
           <h3>Agregar integrante</h3>
           ${disponibles.length === 0 ?
-            `<div class="info-row"><span class="label">No hay congregantes disponibles (sin grupo)</span></div>` :
-            `
+          `<div class="info-row"><span class="label">No hay congregantes disponibles (sin grupo)</span></div>` :
+          `
             <div class="info-row">
               <span class="label">Congregante</span>
               <select style="width:240px" id="sel-add-miembro">
                 ${disponibles
-                  .slice()
-                  .sort((a, b) => String(a?.nombre || '').localeCompare(String(b?.nombre || '')))
-                  .map(c => `<option value="${c.id}">${sanitizar(c.nombre || '—')}</option>`)
-                  .join('')}
+            .slice()
+            .sort((a, b) => String(a?.nombre || '').localeCompare(String(b?.nombre || '')))
+            .map(c => `<option value="${c.id}">${sanitizar(c.nombre || '—')}</option>`)
+            .join('')}
               </select>
             </div>
             <button class="btn-secondary" style="margin-top:12px" onclick="pastorAgregarMiembroAGrupo('${g.id}')">➕ Agregar</button>
             `
-          }
+        }
         </div>
       </div>`;
     }
@@ -5056,29 +5242,29 @@ async function calcularPendientesAlimentarPastor() {
         <div class="info-section" style="margin-bottom:12px">
           <h3>Grupos DC</h3>
           ${grupos.length === 0 ?
-            '<div class="info-row"><span class="label">No hay grupos creados</span></div>' :
-            grupos.map(g => `
+          '<div class="info-row"><span class="label">No hay grupos creados</span></div>' :
+          grupos.map(g => `
               <div class="info-row">
                 <span class="label">${sanitizar(g.nombre)}</span>
                 <span style="font-size:12px;color:var(--texto-suave)">${sanitizar(g.dia_reunion || 'Sin día')} ${sanitizar(g.hora_reunion || '')}</span>
               </div>
             `).join('')
-          }
+        }
         </div>
 
         <div class="info-section">
           <h3>Eventos (local)</h3>
           <button class="btn-primary" style="margin-top:0;margin-bottom:12px" onclick="agregarEventoLocal()">+ Agregar evento</button>
           ${eventos.length === 0 ?
-            '<div class="info-row"><span class="label">No hay eventos</span></div>' :
-            eventos.map(e => `
+          '<div class="info-row"><span class="label">No hay eventos</span></div>' :
+          eventos.map(e => `
               <div class="info-row">
                 <span class="label">${sanitizar(e.titulo || 'Evento')}</span>
                 <span style="font-size:12px;color:var(--texto-suave)">${sanitizar(e.fecha || '')} ${sanitizar(e.hora || '')}</span>
               </div>
               <button class="btn-secondary" style="margin-top:8px" onclick="eliminarEventoLocal('${sanitizar(e.id)}')">Eliminar</button>
             `).join('')
-          }
+        }
         </div>
       </div>
     `;
@@ -5211,6 +5397,48 @@ async function calcularPendientesAlimentarPastor() {
 
       state.misCuidados = (misCuidadosRes?.data || []).filter(esCongreganteActivo);
       state.alertasNuevos = (nuevosSinAsignarRes?.data || []).filter(esCongreganteActivo);
+
+      try {
+        let fichasParaEvaluar = [];
+        const { data: fichasPorNangareko } = await sb
+          .from('fichas_nangareko')
+          .select('congregante_id, tipo_contacto, notas_adicionales')
+          .eq('nangareko_id', userId);
+        if (fichasPorNangareko) {
+          fichasParaEvaluar = fichasPorNangareko;
+        }
+
+        const idsCuidados = (state.misCuidados || []).map(c => c.id).filter(Boolean);
+        if (idsCuidados.length > 0) {
+          try {
+            const { data: fichasPorCuidados } = await sb
+              .from('fichas_nangareko')
+              .select('congregante_id, tipo_contacto, notas_adicionales')
+              .in('congregante_id', idsCuidados);
+            if (fichasPorCuidados && fichasPorCuidados.length > 0) {
+              fichasParaEvaluar = [...fichasParaEvaluar, ...fichasPorCuidados];
+            }
+          } catch (eFichas) {
+            console.warn('No se pudieron consultar fichas adicionales por cuidados:', eFichas);
+          }
+        }
+
+        const primerContactoSet = new Set();
+        for (const f of fichasParaEvaluar) {
+          if (!f?.congregante_id) continue;
+          const nota = String(f.notas_adicionales || '').trim();
+          const tipo = String(f.tipo_contacto || '').trim();
+          if (nota !== 'Primer contacto - Asignación inicial' && tipo !== 'sin_respuesta' && tipo !== 'solicitud_cuidado_pastoral') {
+            primerContactoSet.add(String(f.congregante_id));
+          }
+        }
+        state.congregantesConPrimerContacto = primerContactoSet;
+      } catch (errPC) {
+        console.error('Error al calcular primer contacto (Ñangareko):', errPC);
+        if (!(state.congregantesConPrimerContacto instanceof Set)) {
+          state.congregantesConPrimerContacto = new Set();
+        }
+      }
 
       try {
         state.nangarekoAvisos = await calcularAvisosNangareko(state.misCuidados);
@@ -5457,16 +5685,15 @@ async function calcularPendientesAlimentarPastor() {
             <p>Asigna nuevos ingresos desde el panel de alertas</p>
           </div>` :
           cuidados.map(c => {
-            const quinceDiasMs = 15 * 24 * 60 * 60 * 1000;
-            const puedeMarcarSinRespuesta = c.nangareko_asignado_en && (Date.now() - new Date(c.nangareko_asignado_en).getTime()) >= quinceDiasMs;
+            const tienePrimerContacto = (state.congregantesConPrimerContacto || new Set()).has(String(c.id));
             return `
             <div class="info-section" style="margin-bottom:12px;position:relative">
-              ${(state.nangarekoAvisos || []).some(a => a.congregante_id === c.id) ? '<span class="badge-punto" style="top:10px;right:10px"></span>' : ''}
+              ${(state.nangarekoAvisos || []).some(a => String(a.congregante_id) === String(c.id)) ? '<span class="badge-punto" style="top:10px;right:10px"></span>' : ''}
               <div class="info-row">
-                <span class="label">${c.nombre}</span>
+                <span class="label">${sanitizar(c.nombre || '')}</span>
                 <span class="estado-${c.estado}">${estadoLabel(c.estado)}</span>
               </div>
-              ${(state.congreganteEstancadoIds || new Set()).has(c.id) ? `
+              ${(state.congreganteEstancadoIds || new Set()).has(c.id) || (state.congreganteEstancadoIds || new Set()).has(String(c.id)) ? `
               <div style="margin-top:4px">
                 <span style="display:inline-block;background:#78716c;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px">
                   🐌 Estancado
@@ -5477,17 +5704,18 @@ async function calcularPendientesAlimentarPastor() {
                 <span>${c.telefono || 'No registrado'}</span>
               </div>
               <div style="display:flex; gap:8px; margin-top:12px">
-                <button class="btn-primary" style="flex:1; padding:10px" onclick="abrirFichaContacto('${c.id}', '${c.nombre}')">
+                <button class="btn-primary" style="flex:1; padding:10px" onclick="abrirFichaContacto('${c.id}', '${sanitizar(c.nombre || '')}')">
                   📝 Registrar contacto
                 </button>
                 <button class="btn-primary" style="flex:1; padding:10px; background:var(--gris-medio)" onclick="verHistorialFichas('${c.id}')">
                   📜 Historial
                 </button>
               </div>
-              ${puedeMarcarSinRespuesta ? `
+              ${tienePrimerContacto ? `
               <button class="btn-primary" style="width:100%; margin-top:8px; background:var(--rojo-claro)" onclick="abrirMotivoSinRespuesta('${c.id}', '${sanitizar(c.nombre || '')}')">
                 🔇 Marcar Sin Respuesta
-              </button>` : ''}
+              </button>` : `
+              <div style="margin-top:10px;padding:8px;border-radius:8px;background:rgba(243,156,18,.12);font-size:12px;color:var(--dorado)">🔒 Registrá el 1.er contacto para habilitar todas las opciones</div>`}
             </div>
           `;
           }).join('')
@@ -5500,9 +5728,11 @@ async function calcularPendientesAlimentarPastor() {
       const targetId = congreganteId || state.congreganteSeleccionado?.id;
       const targetNombre = congreganteNombre || state.congreganteSeleccionado?.nombre;
 
+      const tienePrimerContacto = targetId ? (state.congregantesConPrimerContacto || new Set()).has(String(targetId)) : false;
+
       const grupos = state.gruposDC || [];
       const congregante = targetId ?
-        ((state.misCuidados || []).find(c => c.id === targetId) || (state.congregantes || []).find(c => c.id === targetId)) :
+        ((state.misCuidados || []).find(c => String(c.id) === String(targetId)) || (state.congregantes || []).find(c => String(c.id) === String(targetId))) :
         null;
 
       const puedeGraduar = (() => {
@@ -5575,10 +5805,15 @@ async function calcularPendientesAlimentarPastor() {
             <span class="estado-${estadoActual}">${estadoLabel(estadoActual)}</span>
           </div>
 
+          ${!tienePrimerContacto ? `
+          <div style="margin-top:10px;margin-bottom:12px;padding:8px;border-radius:8px;background:rgba(243,156,18,.12);font-size:12px;color:var(--dorado)">
+            🔒 Registrá el 1.er contacto para habilitar todas las opciones
+          </div>` : ''}
+
           <div class="info-row">
             <span class="label">Añua finalizado</span>
             <label class="switch">
-              <input type="checkbox" ${anuaOk ? 'checked' : ''} ${anuaOk ? 'disabled' : ''} ${!tieneColYaAnua ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'anua')" />
+              <input type="checkbox" ${anuaOk ? 'checked' : ''} ${anuaOk ? 'disabled' : ''} ${(!tieneColYaAnua || !tienePrimerContacto) ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'anua')" />
               <span class="slider"></span>
             </label>
           </div>
@@ -5586,7 +5821,7 @@ async function calcularPendientesAlimentarPastor() {
           <div class="info-row">
             <span class="label">Bautizado</span>
             <label class="switch">
-              <input type="checkbox" ${bautismoOk ? 'checked' : ''} ${bautismoOk ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'bautizado')" />
+              <input type="checkbox" ${bautismoOk ? 'checked' : ''} ${bautismoOk ? 'disabled' : ''} ${!tienePrimerContacto ? 'disabled' : ''} onchange="activarHitoCongregante('${targetId}', 'bautizado')" />
               <span class="slider"></span>
             </label>
           </div>
@@ -5594,14 +5829,14 @@ async function calcularPendientesAlimentarPastor() {
           <div class="info-row">
             <span class="label">En DC</span>
             <label class="switch">
-              <input type="checkbox" id="sw-dc-${targetId}" ${dcOk ? 'checked' : ''} ${dcOk ? 'disabled' : ''} onchange="const sel=document.getElementById('sel-dc-${targetId}'); sel.disabled=!this.checked; if(this.checked){ try{ sel.focus(); }catch(e){} try{ sel.click(); }catch(e){} }" />
+              <input type="checkbox" id="sw-dc-${targetId}" ${dcOk ? 'checked' : ''} ${(dcOk || !tienePrimerContacto) ? 'disabled' : ''} onchange="const sel=document.getElementById('sel-dc-${targetId}'); sel.disabled=!this.checked; if(this.checked){ try{ sel.focus(); }catch(e){} try{ sel.click(); }catch(e){} }" />
               <span class="slider"></span>
             </label>
           </div>
 
           <div class="info-row">
             <span class="label">Grupo DC</span>
-            <select id="sel-dc-${targetId}" style="width:200px" ${dcOk ? '' : 'disabled'} onchange="actualizarGrupoDCCongregante('${targetId}', this.value)">
+            <select id="sel-dc-${targetId}" style="width:200px" ${(dcOk && tienePrimerContacto) ? '' : 'disabled'} onchange="actualizarGrupoDCCongregante('${targetId}', this.value)">
               <option value="" ${!congregante?.grupo_dc_id ? 'selected' : ''}>(Sin grupo)</option>
               ${grupos.map(g => `<option value="${g.id}" ${congregante?.grupo_dc_id === g.id ? 'selected' : ''}>${sanitizar(g.nombre)}</option>`).join('')}
             </select>
@@ -5610,12 +5845,12 @@ async function calcularPendientesAlimentarPastor() {
           <div class="info-row">
             <span class="label">Graduado</span>
             <label class="switch">
-              <input type="checkbox" ${estadoActual === 'graduado' ? 'checked' : ''} ${estadoActual === 'graduado' ? 'disabled' : ''} ${(!puedeGraduar || !tieneColYaAnua) ? 'disabled' : ''} onchange="actualizarEstadoCongregante('${targetId}', 'graduado')" />
+              <input type="checkbox" ${estadoActual === 'graduado' ? 'checked' : ''} ${(estadoActual === 'graduado' || !puedeGraduar || !tieneColYaAnua || !tienePrimerContacto) ? 'disabled' : ''} onchange="actualizarEstadoCongregante('${targetId}', 'graduado')" />
               <span class="slider"></span>
             </label>
           </div>
 
-          <button class="btn-secondary" style="margin-top:12px; background:var(--dorado); color:#111" onclick="abrirPedirCuidadoPastoral('${targetId}', '${sanitizar(targetNombre || '')}')">🙋 Pedir Cuidado Pastoral</button>
+          <button class="btn-secondary" style="margin-top:12px; background:var(--dorado); color:#111; ${!tienePrimerContacto ? 'opacity:0.5; cursor:not-allowed;' : ''}" ${!tienePrimerContacto ? 'disabled' : ''} onclick="abrirPedirCuidadoPastoral('${targetId}', '${sanitizar(targetNombre || '')}')">🙋 Pedir Cuidado Pastoral</button>
           <button class="btn-primary" style="margin-top:12px" onclick="guardarPerfilCongregante('${targetId}')">💾 Guardar datos</button>
         </div>
         
@@ -5704,11 +5939,28 @@ async function calcularPendientesAlimentarPastor() {
 
         if (error) throw error;
 
+        const notaStr = String(notas || '').trim();
+        const tipoStr = String(tipo || '').trim();
+        if (notaStr !== 'Primer contacto - Asignación inicial' && tipoStr !== 'sin_respuesta' && tipoStr !== 'solicitud_cuidado_pastoral') {
+          if (!(state.congregantesConPrimerContacto instanceof Set)) {
+            state.congregantesConPrimerContacto = new Set();
+          }
+          state.congregantesConPrimerContacto.add(String(congreganteId));
+        }
+
         mostrarToast('✅ Contacto registrado correctamente');
 
-        state.congreganteSeleccionado = null;
+        const inVersiculo = document.getElementById('ficha-versiculo');
+        if (inVersiculo) inVersiculo.value = '';
+        const inOracion = document.getElementById('ficha-oracion');
+        if (inOracion) inOracion.value = '';
+        const inNotas = document.getElementById('ficha-notas');
+        if (inNotas) inNotas.value = '';
+        const inAusencia = document.getElementById('ficha-por-ausencia');
+        if (inAusencia) inAusencia.checked = false;
+
         await withTimeout(cargarDatosNangareko(), 20000, 'recargar datos ñangareko');
-        cambiarPantalla('home');
+        render();
       } catch (e) {
         console.error('Error al guardar ficha contacto (Ñangareko):', e);
         const msg = String(e?.message || 'sin detalle');
@@ -5723,6 +5975,8 @@ async function calcularPendientesAlimentarPastor() {
         if (btn) { btn.disabled = false; btn.textContent = btnTxt || '✅ Guardar contacto'; }
       }
     };
+
+    window.guardarFicha = window.guardarFichaContacto;
 
     window.abrirFichaContacto = function (id, nombre) {
       state.congreganteSeleccionado = { id, nombre };
@@ -6338,8 +6592,23 @@ async function calcularPendientesAlimentarPastor() {
 
       return `
       <div class="section-header">
-        <h3>Asistencia</h3>
+        <div>
+          <h3>Asistencia</h3>
+          <span id="estado-guardo-asistencia" style="display:block;font-size:11px;color:var(--texto-suave);margin-top:3px">Sincronizado ✓</span>
+        </div>
         <button class="btn-back" onclick="cambiarPantalla('home')">← Volver</button>
+      </div>
+
+      <div class="info-section" style="padding:12px;margin:10px 0">
+        <h3 style="font-size:14px;margin-bottom:8px">⚡ Ingreso rápido en puerta</h3>
+        <div style="display:grid;grid-template-columns:1fr 105px;gap:8px">
+          <input id="ingreso-rapido-nombre" type="text" placeholder="Nombre y apellido" style="width:100%;background:var(--gris-medio);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;color:white" onkeydown="if(event.key==='Enter') ingresoRapidoPuerta()" />
+          <select id="ingreso-rapido-estado" style="width:100%;background:var(--gris-medio);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;color:white">
+            <option value="nuevo">Nuevo</option>
+            <option value="visita">Visita</option>
+          </select>
+        </div>
+        <button class="btn-primary" style="margin-top:8px;padding:10px" onclick="ingresoRapidoPuerta()">Registrar presente</button>
       </div>
 
       <div class="servicio-selector">
@@ -6942,95 +7211,94 @@ async function calcularPendientesAlimentarPastor() {
         if (state.session && state.usuario) mostrarModalVersiculoDiaSiCorresponde();
       });
 
- 	  const ONESIGNAL_BASE_PATH = '/';
+      const ONESIGNAL_BASE_PATH = '/';
 
-	  if ('serviceWorker' in navigator) {
-		window.__onesignalSwRegistrationPromise = (async () => {
-			try {
-				// Si esta página está controlada por un SW viejo, puede interceptar la descarga del SW de OneSignal
-				// y devolver un 404 "fantasma". En ese caso, desregistramos todo y recargamos UNA sola vez.
-				if (navigator.serviceWorker.controller && !sessionStorage.getItem('sw_reset_done')) {
-					sessionStorage.setItem('sw_reset_done', '1');
-					const regs0 = await navigator.serviceWorker.getRegistrations();
-					for (const reg of regs0) {
-						try { await reg.unregister(); } catch (e) { /* noop */ }
-					}
-					setTimeout(() => location.reload(), 50);
-					return null;
-				}
+      if ('serviceWorker' in navigator) {
+        window.__onesignalSwRegistrationPromise = (async () => {
+          try {
+            // Si esta página está controlada por un SW viejo, puede interceptar la descarga del SW de OneSignal
+            // y devolver un 404 "fantasma". En ese caso, desregistramos todo y recargamos UNA sola vez.
+            if (navigator.serviceWorker.controller && !sessionStorage.getItem('sw_reset_done')) {
+              sessionStorage.setItem('sw_reset_done', '1');
+              const regs0 = await navigator.serviceWorker.getRegistrations();
+              for (const reg of regs0) {
+                try { await reg.unregister(); } catch (e) { /* noop */ }
+              }
+              setTimeout(() => location.reload(), 50);
+              return null;
+            }
 
-				const regs = await navigator.serviceWorker.getRegistrations();
-				for (const reg of regs) {
-					try { await reg.unregister(); } catch (e) { /* noop */ }
-				}
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of regs) {
+              try { await reg.unregister(); } catch (e) { /* noop */ }
+            }
 
-				window.__onesignalSwRegistration = await navigator.serviceWorker.register(
-					`${ONESIGNAL_BASE_PATH}OneSignalSDKWorker.js`,
-					{ scope: ONESIGNAL_BASE_PATH }
-				);
-				return window.__onesignalSwRegistration;
-			} catch (e) {
-				console.error('No se pudo registrar el service worker:', e);
-				return null;
-			}
-		})();
-	  }
+            window.__onesignalSwRegistration = await navigator.serviceWorker.register(
+              `${ONESIGNAL_BASE_PATH}OneSignalSDKWorker.js`,
+              { scope: ONESIGNAL_BASE_PATH }
+            );
+            return window.__onesignalSwRegistration;
+          } catch (e) {
+            console.error('No se pudo registrar el service worker:', e);
+            return null;
+          }
+        })();
+      }
 
-	  const ONESIGNAL_APP_ID = '118093bb-70fa-4c85-be91-e4d75404c283';
-	  if (ONESIGNAL_APP_ID) {
-		window.OneSignalDeferred = window.OneSignalDeferred || [];
-		OneSignalDeferred.push(async function (OneSignal) {
-			const scopeBase = ONESIGNAL_BASE_PATH;
-			let swReg = null;
-			try {
-				swReg = await (window.__onesignalSwRegistrationPromise || Promise.resolve(window.__onesignalSwRegistration || null));
-				if (!swReg && 'serviceWorker' in navigator) {
-					swReg = await navigator.serviceWorker.getRegistration(scopeBase);
-				}
-			} catch (e) {
-				console.error('No se pudo obtener serviceWorkerRegistration:', e);
-			}
+      const ONESIGNAL_APP_ID = '118093bb-70fa-4c85-be91-e4d75404c283';
+      if (ONESIGNAL_APP_ID) {
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        OneSignalDeferred.push(async function (OneSignal) {
+          const scopeBase = ONESIGNAL_BASE_PATH;
+          let swReg = null;
+          try {
+            swReg = await (window.__onesignalSwRegistrationPromise || Promise.resolve(window.__onesignalSwRegistration || null));
+            if (!swReg && 'serviceWorker' in navigator) {
+              swReg = await navigator.serviceWorker.getRegistration(scopeBase);
+            }
+          } catch (e) {
+            console.error('No se pudo obtener serviceWorkerRegistration:', e);
+          }
 
-			await OneSignal.init({
-				appId: ONESIGNAL_APP_ID,
-				serviceWorkerRegistration: swReg || undefined,
-				serviceWorkerPath: `${ONESIGNAL_BASE_PATH}OneSignalSDKWorker.js`,
-				serviceWorkerUpdaterPath: `${ONESIGNAL_BASE_PATH}OneSignalSDKUpdaterWorker.js`,
-				serviceWorkerParam: { scope: scopeBase },
-				notifyButton: {
-					enable: true
-				}
-			});
+          await OneSignal.init({
+            appId: ONESIGNAL_APP_ID,
+            serviceWorkerRegistration: swReg || undefined,
+            serviceWorkerPath: `${ONESIGNAL_BASE_PATH}OneSignalSDKWorker.js`,
+            serviceWorkerUpdaterPath: `${ONESIGNAL_BASE_PATH}OneSignalSDKUpdaterWorker.js`,
+            serviceWorkerParam: { scope: scopeBase },
+            notifyButton: {
+              enable: true
+            }
+          });
 
-			try {
-				await OneSignal.User?.PushSubscription?.optIn?.();
-			} catch (e) {
-				console.error('Error al hacer opt-in en OneSignal:', e);
-			}
+          try {
+            await OneSignal.User?.PushSubscription?.optIn?.();
+          } catch (e) {
+            console.error('Error al hacer opt-in en OneSignal:', e);
+          }
 
-			try {
-				const osId = await OneSignal.User?.onesignalId;
-				const pushId = await OneSignal.User?.PushSubscription?.id;
-				console.log('OneSignal:', { osId, pushId, scopeBase });
-				await guardarOneSignalIdsEnUsuario({ osId, pushId });
-			} catch (e) {
-				console.error('Diagnóstico OneSignal error:', e);
-			}
+          try {
+            const osId = await OneSignal.User?.onesignalId;
+            const pushId = await OneSignal.User?.PushSubscription?.id;
+            console.log('OneSignal:', { osId, pushId, scopeBase });
+            await guardarOneSignalIdsEnUsuario({ osId, pushId });
+          } catch (e) {
+            console.error('Diagnóstico OneSignal error:', e);
+          }
 
-			try {
-				const perm = await OneSignal.Notifications.permission;
-				if (perm !== 'granted') {
-					await OneSignal.Notifications.requestPermission();
-				}
-			} catch (e) {
-				console.error('Error al solicitar permiso de notificaciones:', e);
-			}
-		});
-	  }
+          try {
+            const perm = await OneSignal.Notifications.permission;
+            if (perm !== 'granted') {
+              await OneSignal.Notifications.requestPermission();
+            }
+          } catch (e) {
+            console.error('Error al solicitar permiso de notificaciones:', e);
+          }
+        });
+      }
     }
   </script>
   <script src="juego-hory.js" defer></script>
 </body>
 
 </html>
-
